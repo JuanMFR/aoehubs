@@ -147,20 +147,48 @@ Después podés gestionar el resto desde `/admin/users` (botón "Hacer admin" / 
 
 ### Estado actual
 
-Implementado en fase c.1 + c.2. Para generar la build distribuible:
+Distribución vía **Velopack** + GitHub Releases con auto-update. Reemplaza el flow viejo de Inno Setup.
+
+**Pre-requisito una sola vez** (en la máquina que builda):
+
+```powershell
+dotnet tool install -g vpk
+```
+
+**Para generar release** (cada nueva versión):
 
 ```powershell
 cd companion
-.\publish.ps1
+# Bumpear <Version> en AoE2Companion.csproj antes (ej. 0.3.0 → 0.3.1)
+.\publish.ps1 -BackendUrl https://aoehubs.com
 ```
 
 Outputs:
-- `companion/publish/` — carpeta portable (124MB exe + screens/ + tessdata/ = 144MB total). Para uso "extraer y correr".
-- `companion/dist/AoE2CompanionSetup-X.Y.Z.exe` — instalador Inno Setup (135MB). Si Inno Setup está instalado, `publish.ps1` lo compila automáticamente.
+- `companion/publish/` — carpeta portable (~280MB con runtime + screens + tessdata)
+- `companion/releases/` — paquete Velopack:
+  - `AoE2Companion-win-Setup.exe` — bootstrap installer para usuarios nuevos
+  - `AoE2Companion-X.Y.Z-full.nupkg` — paquete principal
+  - `AoE2Companion-X.Y.Z-delta.nupkg` — diff incremental (cuando hay versión anterior)
+  - `RELEASES` — manifest
 
-El instalador va a `%LOCALAPPDATA%\Programs\AoE2Companion\` (no requiere admin), crea shortcut en Start Menu, registra desinstalador en "Agregar/quitar programas". El config del usuario (token, URL del backend) vive separado en `%APPDATA%\AoE2Companion\config.json` para que reinstalaciones no rompan la sesión.
+**Para distribuir**: subí TODOS los archivos de `releases/` a una nueva GitHub Release con tag `vX.Y.Z` (importante: el prefijo `v`).
 
-Para nueva versión: bumpear `MyAppVersion` en [companion/installer.iss](../companion/installer.iss), correr `publish.ps1`, distribuir el nuevo `setup.exe`.
+**Cómo funciona el auto-update**:
+- El companion al arrancar llama `VelopackApp.Build().Run()` que aplica updates pendientes (descargados en sesión anterior) y reinicia.
+- En background, una task chequea GitHub cada hora. Si hay versión nueva, la descarga sin interrumpir al usuario.
+- En el próximo arranque del companion, la versión nueva ya está instalada.
+
+**Path de instalación**: Velopack instala en `%LOCALAPPDATA%\AoE2Companion\` (sin admin, igual que Inno antes). El config del usuario sigue viviendo separado en `%APPDATA%\AoE2Companion\config.json`.
+
+### Migración desde Inno Setup (testers existentes)
+
+Los testers que tienen instalado el companion v0.1.0 / v0.2.x (Inno Setup) tienen que hacerlo una vez:
+
+1. **Desinstalar la versión vieja** desde Configuración → Aplicaciones → "AoE2 Companion" → Desinstalar (path viejo: `%LOCALAPPDATA%\Programs\AoE2Companion\`)
+2. **Bajar el nuevo `AoE2Companion-win-Setup.exe`** desde aoehubs.com/companion (link apunta al GitHub Release latest)
+3. **Instalar y abrir** — el token guardado en `%APPDATA%\AoE2Companion\config.json` se preserva, no hay que regenerarlo
+
+Después de eso, todas las próximas versiones se aplican solas en el background.
 
 ### Code signing (pendiente)
 

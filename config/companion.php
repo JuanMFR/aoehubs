@@ -18,7 +18,7 @@ return [
      */
     'download_url' => env(
         'COMPANION_DOWNLOAD_URL',
-        'https://github.com/JuanMFR/aoehubs/releases/latest/download/AoE2CompanionSetup.exe'
+        'https://github.com/JuanMFR/aoehubs/releases/latest/download/AoE2Companion-win-Setup.exe'
     ),
 
     /**
@@ -26,7 +26,7 @@ return [
      * una release nueva. Es informativa — no hay verificacion server-side
      * de que el companion del user este actualizado.
      */
-    'version' => env('COMPANION_VERSION', '0.1.0'),
+    'version' => env('COMPANION_VERSION', '0.3.0'),
 
     /**
      * Tamaño aprox del setup, para mostrar en la pagina antes de descargar.

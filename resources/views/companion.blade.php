@@ -195,6 +195,29 @@
         </div>
     </section>
 
+    {{-- Aviso para testers existentes (Inno Setup → Velopack) --}}
+    <section>
+        <details class="group rounded-xl border border-sky-900/40 bg-sky-950/10 p-5">
+            <summary class="cursor-pointer select-none text-sm font-semibold text-sky-300 flex items-center gap-2">
+                <span class="inline-block transition-transform group-open:rotate-90">▶</span>
+                ¿Ya tenías el companion antes de v0.3.0? Leer esto
+            </summary>
+            <div class="mt-3 text-sm text-zinc-300 space-y-2">
+                <p>Desde la versión <strong>0.3.0</strong> el companion usa <strong>Velopack</strong> para auto-actualizarse — todas las versiones futuras se aplican solas sin que tengas que reinstalar nada.</p>
+                <p>Pero por única vez tenés que hacer una migración manual:</p>
+                <ol class="list-decimal pl-5 space-y-1 text-zinc-400 text-xs">
+                    <li>Abrí <strong class="text-zinc-200">Configuración de Windows → Aplicaciones</strong></li>
+                    <li>Buscá <strong class="text-zinc-200">"AoE2 Companion"</strong> en la lista y desinstalalo</li>
+                    <li>Bajá el nuevo setup desde el botón "Descargar para Windows" arriba</li>
+                    <li>Ejecutalo — instala el companion nuevo y se abre solo</li>
+                </ol>
+                <p class="text-xs text-zinc-500 pt-2 border-t border-sky-900/30">
+                    Tu token guardado se preserva — no necesitás regenerarlo. A partir de esta versión, todas las nuevas se actualizan en segundo plano automáticamente.
+                </p>
+            </div>
+        </details>
+    </section>
+
     {{-- Aviso SmartScreen --}}
     <section>
         <details class="group rounded-xl border border-amber-900/40 bg-amber-950/10 p-5">
