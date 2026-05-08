@@ -11,11 +11,12 @@ use Illuminate\Support\Str;
 
 class Matchmaking
 {
-    // Pool de mapas competitivos para 1v1 ranked. Hardcodeado por ahora;
-    // en una versión futura va a ser una rotación con miniaturas y bans.
+    // Pool de mapas competitivos para 1v1 ranked. Hardcodeado por ahora.
+    // Cantidad IMPAR para que el draft de bans tenga ventaja simetrica
+    // (cada uno banea el mismo numero de mapas, queda 1 = el final).
     public const MAP_POOL = [
         'Arabia', 'Arena', 'Black Forest', 'Nomad', 'Hideout',
-        'Hill Fort', 'Acropolis', 'Land Madness', 'Mediterranean', 'Continental',
+        'Hill Fort', 'Acropolis', 'Land Madness', 'Mediterranean',
     ];
 
     // Pool de civilizaciones de AoE2 DE — incluye DLCs hasta Three Kingdoms.

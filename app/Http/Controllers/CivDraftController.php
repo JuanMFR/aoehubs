@@ -392,8 +392,13 @@ class CivDraftController extends Controller
         $myFinal   = $isHost ? $draft->host_final_civ : $draft->opponent_final_civ;
         $oppFinal  = $isHost ? $draft->opponent_final_civ : $draft->host_final_civ;
 
-        // Durante 'picking' ocultamos los picks del rival hasta que ambos confirmen
+        // Durante 'picking' ocultamos los picks del rival hasta que ambos confirmen.
         $showOppPicks = $draft->phase !== CivDraft::PHASE_PICKING;
+
+        // Durante 'finalizing' ocultamos el final pick del rival hasta que
+        // ambos hayan elegido. Sin esto, el primero en submitear le da info
+        // gratis al rival (puede contrapickear sabiendo lo que vos elegiste).
+        $showOppFinal = $draft->phase === CivDraft::PHASE_COMPLETED;
 
         return [
             'phase'             => $draft->phase,
@@ -406,7 +411,7 @@ class CivDraftController extends Controller
                 ? $this->remainingPicksFor($draft, $isHost)
                 : null,
             'my_final'          => $myFinal,
-            'opp_final'         => $oppFinal,
+            'opp_final'         => $showOppFinal ? $oppFinal : null,
             'my_picked'         => $myPicks !== null,
             'opp_picked'        => $oppPicks !== null,
             'my_banned'         => $myBans !== null,
