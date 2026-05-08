@@ -69,4 +69,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/seasons',                       [AdminController::class, 'seasons'])->name('seasons');
     Route::post('/seasons/{season}/ends-at',     [AdminController::class, 'updateSeasonEndsAt'])->name('seasons.ends-at');
     Route::post('/seasons/{season}/close',       [AdminController::class, 'closeSeason'])->name('seasons.close');
+
+    Route::get('/maps',                  [AdminController::class, 'maps'])->name('maps');
+    Route::post('/maps',                 [AdminController::class, 'storeMap'])->name('maps.store');
+    Route::post('/maps/extract-replay',  [AdminController::class, 'extractMapFromReplay'])->name('maps.extract-replay');
+    Route::patch('/maps/{map}',          [AdminController::class, 'updateMap'])->name('maps.update');
+    Route::post('/maps/{map}/toggle',    [AdminController::class, 'toggleMap'])->name('maps.toggle');
+    Route::delete('/maps/{map}',         [AdminController::class, 'destroyMap'])->name('maps.destroy');
 });

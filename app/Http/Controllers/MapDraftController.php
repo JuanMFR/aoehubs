@@ -133,7 +133,7 @@ class MapDraftController extends Controller
 
         return [
             'match_id'             => $match->id,
-            'pool'                 => Matchmaking::MAP_POOL,
+            'pool'                 => Matchmaking::mapPool(),
             'bans'                 => $bans,
             'final_map'            => $draft->final_map,
             'is_completed'         => $draft->final_map !== null,
@@ -153,7 +153,7 @@ class MapDraftController extends Controller
     private function remainingMaps(MapDraft $draft): array
     {
         $bannedNames = array_column($draft->bans_json ?? [], 'map');
-        return array_values(array_diff(Matchmaking::MAP_POOL, $bannedNames));
+        return array_values(array_diff(Matchmaking::mapPool(), $bannedNames));
     }
 
     private function currentTurnUserId(GameMatch $match, MapDraft $draft): int

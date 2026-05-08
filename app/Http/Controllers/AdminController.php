@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Api\CompanionApiController;
 use App\Models\GameMatch;
+use App\Models\Map;
 use App\Models\QueueEntry;
 use App\Models\Season;
 use App\Models\User;
@@ -181,6 +182,122 @@ class AdminController extends Controller
         $season->update(['ends_at' => $endsAt]);
 
         return back()->with('flash', "Fecha de cierre actualizada: " . ($endsAt?->toDateString() ?? 'sin fecha'));
+    }
+
+    // ─── Maps CRUD ─────────────────────────────────────────────────────
+
+    public function maps()
+    {
+        $maps = Map::orderBy('is_active', 'desc')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $iconBaseDir = public_path('images/maps');
+        return view('admin.maps', compact('maps', 'iconBaseDir'));
+    }
+
+    public function storeMap(Request $request)
+    {
+        $data = $request->validate([
+            'name'       => ['required', 'string', 'max:60', 'unique:maps,name'],
+            'icon_path'  => ['nullable', 'string', 'max:255'],
+            'rms_map_id' => ['nullable', 'integer', 'min:0'],
+            'sort_order' => ['nullable', 'integer'],
+            'is_active'  => ['nullable', 'boolean'],
+        ]);
+
+        Map::create([
+            'name'       => $data['name'],
+            'icon_path'  => $data['icon_path'] ?? null,
+            'rms_map_id' => $data['rms_map_id'] ?? null,
+            'sort_order' => $data['sort_order'] ?? 999,
+            'is_active'  => $data['is_active'] ?? true,
+        ]);
+
+        return back()->with('flash', "Mapa '{$data['name']}' agregado al pool.");
+    }
+
+    public function updateMap(Request $request, Map $map)
+    {
+        $data = $request->validate([
+            'name'       => ['required', 'string', 'max:60', 'unique:maps,name,' . $map->id],
+            'icon_path'  => ['nullable', 'string', 'max:255'],
+            'rms_map_id' => ['nullable', 'integer', 'min:0'],
+            'sort_order' => ['nullable', 'integer'],
+        ]);
+
+        $map->update($data);
+        return back()->with('flash', "Mapa '{$map->name}' actualizado.");
+    }
+
+    public function toggleMap(Map $map)
+    {
+        $map->update(['is_active' => ! $map->is_active]);
+        $newState = $map->is_active ? 'activado' : 'desactivado';
+        return back()->with('flash', "Mapa '{$map->name}' {$newState}.");
+    }
+
+    public function destroyMap(Map $map)
+    {
+        $name = $map->name;
+        $map->delete();
+        return back()->with('flash', "Mapa '{$name}' eliminado del pool.");
+    }
+
+    /**
+     * Recibe un replay file via upload, lo parsea con scripts/parse_replay.py
+     * y devuelve la metadata relevante (canonical map_name + rms_map_id).
+     * El frontend usa esto para pre-poblar el form de crear mapa con los
+     * datos extraidos.
+     *
+     * Devuelve JSON: {map_name, rms_map_id, ok, error?}.
+     */
+    public function extractMapFromReplay(Request $request)
+    {
+        $request->validate([
+            'replay' => ['required', 'file', 'max:10240'], // 10MB max
+        ]);
+
+        $file = $request->file('replay');
+        $tempPath = $file->store('temp', 'local');
+        $absolute = Storage::disk('local')->path($tempPath);
+
+        try {
+            $parser = app(\App\Services\ReplayParser::class);
+            $parsed = $parser->parse($absolute);
+
+            $mapName  = $parsed['map_name']    ?? null;
+            $rmsId    = $parsed['rms_map_id']  ?? null;
+            $rmsFile  = $parsed['rms_filename'] ?? null;
+
+            if (!$mapName) {
+                return response()->json([
+                    'ok'    => false,
+                    'error' => 'No se pudo identificar el mapa. rms_filename=' . ($rmsFile ?? '?')
+                              . ' (probablemente map pack del Workshop sin id estandar).',
+                ], 422);
+            }
+
+            // Sugerimos un slug derivado del nombre para el icon_path.
+            $slug = strtolower(str_replace(' ', '_', $mapName));
+
+            return response()->json([
+                'ok'           => true,
+                'map_name'     => $mapName,
+                'rms_map_id'   => $rmsId,
+                'rms_filename' => $rmsFile,
+                'icon_path'    => "maps/{$slug}.png",
+                'already_exists' => Map::where('name', $mapName)->exists(),
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok'    => false,
+                'error' => 'Error parseando replay: ' . $e->getMessage(),
+            ], 500);
+        } finally {
+            Storage::disk('local')->delete($tempPath);
+        }
     }
 
     /**

@@ -13,6 +13,7 @@
         <a href="{{ route('admin.users') }}" class="px-3 py-1.5 rounded bg-zinc-800 text-zinc-100">Usuarios</a>
         <a href="{{ route('admin.matches') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Matches</a>
         <a href="{{ route('admin.seasons') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Seasons</a>
+        <a href="{{ route('admin.maps') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Maps</a>
     </nav>
 
     {{-- Search --}}

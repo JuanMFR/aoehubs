@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\GameMatch;
+use App\Models\Map;
 use App\Models\MapDraft;
 use App\Models\QueueEntry;
 use App\Models\User;
@@ -11,13 +12,24 @@ use Illuminate\Support\Str;
 
 class Matchmaking
 {
-    // Pool de mapas competitivos para 1v1 ranked. Hardcodeado por ahora.
-    // Cantidad IMPAR para que el draft de bans tenga ventaja simetrica
-    // (cada uno banea el mismo numero de mapas, queda 1 = el final).
-    public const MAP_POOL = [
-        'Arabia', 'Arena', 'Black Forest', 'Nomad', 'Hideout',
-        'Hill Fort', 'Acropolis', 'Land Madness', 'Mediterranean',
-    ];
+    /**
+     * Pool de mapas competitivos para 1v1 ranked. Lee desde la tabla `maps`
+     * (gestionada via /admin/maps). Cantidad IMPAR para que el draft de bans
+     * tenga ventaja simetrica.
+     *
+     * Si la tabla esta vacia (pre-deploy de la feature), cae a una lista
+     * hardcoded como safety net asi el matchmaking no se rompe.
+     */
+    public static function mapPool(): array
+    {
+        $names = Map::activeNames();
+        if (!empty($names)) return $names;
+
+        return [
+            'Arabia', 'Arena', 'Black Forest', 'Nomad', 'Hideout',
+            'Hill Fort', 'Acropolis', 'Land Madness', 'Mediterranean',
+        ];
+    }
 
     // Pool de civilizaciones de AoE2 DE — incluye DLCs hasta Three Kingdoms.
     public const CIV_POOL = [
@@ -77,7 +89,8 @@ class Matchmaking
     public function createTestHostMatch(User $host): GameMatch
     {
         $bot = User::where('steam_id', 'BOTDEV_PERMANENT_QUEUE')->firstOrFail();
-        return $this->createPendingMatch($host, $bot, static::MAP_POOL[array_rand(static::MAP_POOL)]);
+        $pool = static::mapPool();
+        return $this->createPendingMatch($host, $bot, $pool[array_rand($pool)]);
     }
 
     /**
@@ -104,7 +117,7 @@ class Matchmaking
                 'lobbyName' => "test-joiner-{$lobbyId}",
                 'password'  => $password,
                 'server'    => 'westeurope',
-                'map'       => static::MAP_POOL[0],
+                'map'       => static::mapPool()[0],
             ],
             'lobby_id' => $lobbyId,
             'status'   => GameMatch::STATUS_PENDING,
@@ -198,7 +211,10 @@ class Matchmaking
                 'lobbyName' => 'ranked-' . Str::lower(Str::random(6)),
                 'password'  => Str::lower(Str::random(8)),
                 'server'    => 'westeurope',
-                'map'       => $map ?? static::MAP_POOL[array_rand(static::MAP_POOL)],
+                'map'       => $map ?? (function () {
+                    $pool = static::mapPool();
+                    return $pool[array_rand($pool)];
+                })(),
             ],
             'status' => GameMatch::STATUS_PENDING,
         ]);
