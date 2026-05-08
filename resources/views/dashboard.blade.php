@@ -106,7 +106,11 @@
                         <div>
                             <h2 class="text-lg font-semibold">Buscar partida ranked</h2>
                             <p class="mt-1 text-sm text-zinc-400">
-                                Hay un Bot Dev permanentemente en cola — vas a quedar emparejado al instante para testing.
+                                @if ($botInQueue)
+                                    Hay un Bot Dev permanentemente en cola — vas a quedar emparejado al instante para testing.
+                                @else
+                                    Vas a quedar en cola hasta que aparezca otro jugador buscando partida.
+                                @endif
                             </p>
                         </div>
                         <form method="POST" action="{{ route('queue.join') }}" class="shrink-0" data-loading-form>

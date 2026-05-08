@@ -32,6 +32,11 @@ class DashboardController extends Controller
             ? CooldownService::formatSeconds($cooldownSeconds)
             : null;
 
+        // Si el bot dev esta en queue (solo en dev local typically), avisamos
+        // al user que va a quedar emparejado al instante. En prod esta apagado
+        // y mostramos el mensaje generico.
+        $botInQueue = QueueEntry::where('is_bot', true)->exists();
+
         // Match activa (drafting, pending o in_progress) — para mostrar el
         // CTA "estás en partida" cuando el user vuelve al dashboard mid-flow.
         $activeMatch = GameMatch::with(['host', 'opponent'])
@@ -73,6 +78,7 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'user', 'season', 'queueEntry', 'inCooldown', 'cooldownLeft', 'cooldownSeconds',
             'activeMatch', 'activeMatchUrl', 'activeMatchRival', 'seasonStats',
+            'botInQueue',
         ));
     }
 
