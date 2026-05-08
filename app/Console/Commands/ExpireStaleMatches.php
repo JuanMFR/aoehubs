@@ -30,25 +30,22 @@ class ExpireStaleMatches extends Command
     protected $description = 'Mark zombie matches as abandoned, apply forfeit on disconnect mid-game';
 
     private const STALE_AFTER_MIN          = 5;
-    private const NO_HEARTBEAT_GRACE_HR    = 1;
+    private const PENDING_GRACE_MIN        = 10; // grace para que el lobby se arme
     private const BOT_STEAM_ID             = 'BOTDEV_PERMANENT_QUEUE';
 
     public function handle(): int
     {
         $staleCutoff   = now()->subMinutes(self::STALE_AFTER_MIN);
-        $createdCutoff = now()->subHours(self::NO_HEARTBEAT_GRACE_HR);
+        $pendingCutoff = now()->subMinutes(self::PENDING_GRACE_MIN);
 
-        // Regla 1: pending huérfanos viejos (companion nunca llegó)
-        $orphaned = GameMatch::where('status', GameMatch::STATUS_PENDING)
-            ->whereNull('host_heartbeat_at')
-            ->whereNull('opponent_heartbeat_at')
-            ->where('created_at', '<', $createdCutoff)
-            ->update(['status' => GameMatch::STATUS_ABANDONED]);
-
-        // Regla 2 + 3: matches activos. Inspeccionamos uno por uno porque la
-        // decisión depende del par (host_stale, opp_stale) y de si hay bot.
+        // Procesamos uno por uno porque la decisión depende del par
+        // (host_stale, opp_stale, isBot) y del status.
         $active = GameMatch::with(['host', 'opponent'])
-            ->whereIn('status', [GameMatch::STATUS_PENDING, GameMatch::STATUS_IN_PROGRESS])
+            ->whereIn('status', [
+                GameMatch::STATUS_DRAFTING,
+                GameMatch::STATUS_PENDING,
+                GameMatch::STATUS_IN_PROGRESS,
+            ])
             ->get();
 
         $abandoned = 0;
@@ -58,23 +55,40 @@ class ExpireStaleMatches extends Command
             $hostStale = $this->isStale($match->host_heartbeat_at, $staleCutoff);
             $oppStale  = $this->isStale($match->opponent_heartbeat_at, $staleCutoff);
 
-            $hostIsBot = $match->host->steam_id     === self::BOT_STEAM_ID;
-            $oppIsBot  = $match->opponent->steam_id === self::BOT_STEAM_ID;
+            $hostIsBot = $match->host->steam_id            === self::BOT_STEAM_ID;
+            $oppIsBot  = $match->opponent?->steam_id       === self::BOT_STEAM_ID;
 
-            if ($hostIsBot || $oppIsBot) {
-                // Match contra bot: el bot no heartbeatea, sólo nos importa el humano.
-                $humanStale = $hostIsBot ? $oppStale : $hostStale;
-                if ($humanStale && $match->status === GameMatch::STATUS_IN_PROGRESS) {
-                    // El humano se fue mid-partida contra bot. Sin rating change.
+            // ── Drafting o Pending: si el humano dejo de heartbeatear y la
+            //    match tiene mas de PENDING_GRACE_MIN, abandonamos. Sin
+            //    rating change porque la partida nunca arranco.
+            if (in_array($match->status, [GameMatch::STATUS_DRAFTING, GameMatch::STATUS_PENDING], true)) {
+                if ($match->created_at >= $pendingCutoff) continue; // demasiado nueva, dale tiempo
+
+                $humanStale = false;
+                if (! $hostIsBot && $hostStale) $humanStale = true;
+                if (! $oppIsBot  && $oppStale)  $humanStale = true;
+
+                if ($humanStale) {
                     $match->update(['status' => GameMatch::STATUS_ABANDONED]);
                     $abandoned++;
                 }
                 continue;
             }
 
-            // Match real (PvP). Aplicamos forfeit si solo uno se cayó.
-            if ($match->status !== GameMatch::STATUS_IN_PROGRESS) continue;
+            // ── In progress vs bot: el bot no heartbeatea, miramos solo al humano.
+            //    Si el humano se cayo mid-game, abandon (sin forfeit/rating change
+            //    contra bot).
+            if ($hostIsBot || $oppIsBot) {
+                $humanStale = $hostIsBot ? $oppStale : $hostStale;
+                if ($humanStale) {
+                    $match->update(['status' => GameMatch::STATUS_ABANDONED]);
+                    $abandoned++;
+                }
+                continue;
+            }
 
+            // ── In progress PvP: aplicamos forfeit si solo uno se cayó. Si los
+            //    dos se cayeron, abandonamos sin rating change.
             if ($hostStale && $oppStale) {
                 $match->update(['status' => GameMatch::STATUS_ABANDONED]);
                 $abandoned++;
@@ -85,10 +99,9 @@ class ExpireStaleMatches extends Command
                 $this->applyForfeit($match, winnerId: $match->host_user_id);
                 $forfeits++;
             }
-            // ambos vivos: no action
         }
 
-        $this->info("Orphaned: {$orphaned} | Abandoned: {$abandoned} | Forfeits: {$forfeits}");
+        $this->info("Abandoned: {$abandoned} | Forfeits: {$forfeits}");
         return self::SUCCESS;
     }
 
