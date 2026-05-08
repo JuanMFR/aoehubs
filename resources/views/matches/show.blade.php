@@ -188,6 +188,117 @@
                 @endif
             </div>
         </section>
+
+        {{-- Fallback manual: si el companion falla por OCR raro/cambio de UI/etc.,
+             el host puede armar la sala a mano con esta info y la partida sigue. --}}
+        <section>
+            <details class="group rounded-xl border border-amber-900/40 bg-amber-950/10">
+                <summary class="cursor-pointer select-none flex items-center gap-2 px-5 py-4 text-sm font-medium text-amber-300 hover:text-amber-200">
+                    <span class="inline-block transition-transform group-open:rotate-90">▶</span>
+                    ¿El companion no configuró la sala? Crear manualmente
+                </summary>
+                <div class="px-5 pb-5 pt-2 border-t border-amber-900/40 space-y-4">
+                    @php
+                        $cfg      = $match->config_json ?? [];
+                        $lobbyNm  = $cfg['lobbyName'] ?? '—';
+                        $password = $cfg['password']  ?? '—';
+                        $server   = $cfg['server']    ?? '—';
+                    @endphp
+
+                    <p class="text-sm text-zinc-300">
+                        Si el companion no detecta la sala o falla al configurarla, podés armar la sala a mano con estos datos.
+                        El sistema valida después la partida igual contra el draft, así que <strong class="text-amber-300">la match cuenta para rating si jugás con la config correcta</strong>.
+                    </p>
+
+                    @if ($isHost)
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">1. Crear sala (Multijugador → Organizar partida)</h3>
+                            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-mono">
+                                <div><span class="text-zinc-500">Nombre:</span> <span class="text-accent select-all">{{ $lobbyNm }}</span></div>
+                                <div><span class="text-zinc-500">Password:</span> <span class="text-accent select-all">{{ $password }}</span></div>
+                                <div><span class="text-zinc-500">Servidor:</span> {{ $server }}</div>
+                                <div><span class="text-zinc-500">Visibilidad:</span> Pública</div>
+                                <div><span class="text-zinc-500">Cantidad:</span> 2 jugadores</div>
+                                <div><span class="text-zinc-500">Retraso:</span> 3 minutos</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">2. Settings de la sala (panel principal)</h3>
+                            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                                <div class="font-mono"><span class="text-zinc-500">Mapa:</span> <span class="text-accent">{{ $mapName ? __($mapName) : '—' }}</span></div>
+                                <div class="font-mono"><span class="text-zinc-500">Tamaño:</span> Pequeñito</div>
+                                <div class="font-mono"><span class="text-zinc-500">Recursos:</span> Estándar</div>
+                                <div class="font-mono"><span class="text-zinc-500">Velocidad:</span> Normal</div>
+                                <div class="font-mono"><span class="text-zinc-500">Población:</span> 200</div>
+                                <div class="font-mono"><span class="text-zinc-500">Edad inicial:</span> Estándar</div>
+                                <div class="font-mono"><span class="text-zinc-500">Edad final:</span> Estándar</div>
+                                <div class="font-mono"><span class="text-zinc-500">Victoria:</span> Conquista</div>
+                                <div class="font-mono col-span-1 sm:col-span-2"><span class="text-zinc-500">Visibilidad:</span> según mapa (Selva Negra → Todo visible · Arena → Explorado · resto → Normal)</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">3. Equipos (sección "Equipos")</h3>
+                            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm font-mono space-y-1">
+                                <div>✓ Bloquear equipos</div>
+                                <div>✓ Equipos juntos</div>
+                                <div>✓ Exploración compartida</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">4. Avanzado (sección "Avanzado")</h3>
+                            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm font-mono space-y-1">
+                                <div>✓ Bloquear velocidad</div>
+                                <div>✗ Permitir trampas</div>
+                                <div>✗ Modo turbo</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">5. Civilización</h3>
+                            <p class="text-sm text-zinc-400">
+                                Elegí <strong class="text-emerald-300">{{ $myCivPick ? __($myCivPick) : '—' }}</strong> en tu slot. Tu rival va a elegir su civ del draft cuando entre.
+                            </p>
+                        </div>
+
+                        <div class="text-xs text-zinc-500 italic">
+                            Compartile el nombre de sala + password al rival si tarda en aparecer (Discord, etc.). El joiner también tiene su panel de fallback con esta info.
+                        </div>
+                    @else
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Datos para entrar a la sala</h3>
+                            <div class="rounded-lg border border-zinc-800 bg-zinc-950 p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm font-mono">
+                                <div><span class="text-zinc-500">Nombre de sala:</span> <span class="text-accent select-all">{{ $lobbyNm }}</span></div>
+                                <div><span class="text-zinc-500">Password:</span> <span class="text-accent select-all">{{ $password }}</span></div>
+                                <div><span class="text-zinc-500">Servidor:</span> {{ $server }}</div>
+                                @if ($match->lobby_id)
+                                    <div class="col-span-1 sm:col-span-2">
+                                        <span class="text-zinc-500">Link directo:</span>
+                                        <a href="aoe2de://0/{{ $match->lobby_id }}" class="text-accent hover:underline">aoe2de://0/{{ $match->lobby_id }}</a>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Cómo entrar manualmente</h3>
+                            <ol class="text-sm text-zinc-400 list-decimal pl-5 space-y-1">
+                                <li>Multijugador → Buscar partida → filtro por servidor <strong class="text-zinc-200">{{ $server }}</strong>.</li>
+                                <li>Buscá la sala <strong class="text-accent">{{ $lobbyNm }}</strong> y entrá.</li>
+                                <li>Pegá la password: <code class="text-accent">{{ $password }}</code></li>
+                                <li>En el lobby, elegí tu civilización: <strong class="text-emerald-300">{{ $myCivPick ? __($myCivPick) : '—' }}</strong>.</li>
+                            </ol>
+                        </div>
+
+                        <div class="text-xs text-zinc-500 italic">
+                            Si la sala no aparece todavía, el host puede estar tardando en armarla. Avisale por Discord si pasa tiempo.
+                        </div>
+                    @endif
+                </div>
+            </details>
+        </section>
     @endif
 
     {{-- En partida --}}
