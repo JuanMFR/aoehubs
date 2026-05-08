@@ -23,6 +23,11 @@ class MatchValidator
      * Settings obligatorios para ranked. Las claves matchean lo que devuelve
      * scripts/parse_replay.py en `settings.*`. Valores esperados son los
      * defaults de un 1v1 competitivo.
+     *
+     * NO se valida `reveal_map`/`exploration` porque varia por mapa (Selva
+     * Negra: Todo visible; Arena: Explorado; otros: Normal). Es preferencia
+     * del host y no afecta el balance competitivo. El companion tampoco lo
+     * fuerza al setear el lobby.
      */
     private const RANKED_SETTINGS = [
         'population_limit' => 200,
