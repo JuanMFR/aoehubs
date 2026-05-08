@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\GameMatch;
+use App\Models\Season;
+use App\Models\SeasonStat;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -101,9 +103,44 @@ class UserProfileController extends Controller
             ->limit(10)
             ->get();
 
+        // Stats de la season actual (para mostrar prominentemente en el header).
+        $currentSeason = Season::current();
+        $seasonWins = 0; $seasonLosses = 0; $seasonWinRate = 0; $seasonTotal = 0;
+        if ($currentSeason) {
+            $seasonWins = GameMatch::where('winner_user_id', $user->id)
+                ->where('status', GameMatch::STATUS_COMPLETED)
+                ->where('season_id', $currentSeason->id)
+                ->count();
+            $seasonLosses = GameMatch::where(function ($q) use ($user) {
+                    $q->where('host_user_id', $user->id)->orWhere('opponent_user_id', $user->id);
+                })
+                ->where('status', GameMatch::STATUS_COMPLETED)
+                ->where('season_id', $currentSeason->id)
+                ->where('winner_user_id', '!=', $user->id)
+                ->whereNotNull('winner_user_id')
+                ->count();
+            $seasonTotal   = $seasonWins + $seasonLosses;
+            $seasonWinRate = $seasonTotal > 0 ? round($seasonWins / $seasonTotal * 100) : 0;
+        }
+
+        // Snapshots de seasons cerradas (final_rank, plays/wins, etc.).
+        $pastSeasonStats = SeasonStat::where('user_id', $user->id)
+            ->with('season')
+            ->whereHas('season', fn ($q) => $q->where('status', Season::STATUS_CLOSED))
+            ->orderByDesc('season_id')
+            ->get();
+
+        // Estado del companion token — solo se muestra al propio user (la
+        // seccion de la vista esta gateada por $isMe). last_used_at viene
+        // de personal_access_tokens.last_used_at, que Sanctum actualiza
+        // cuando el companion hace una request con el token.
+        $companionToken = $user->tokens()->where('name', 'companion')->latest()->first();
+
         return view('users.show', compact(
             'user', 'wins', 'losses', 'totalCompleted', 'winRate',
-            'topCivs', 'topMaps', 'recentMatches'
+            'currentSeason', 'seasonWins', 'seasonLosses', 'seasonTotal', 'seasonWinRate',
+            'pastSeasonStats',
+            'topCivs', 'topMaps', 'recentMatches', 'companionToken'
         ));
     }
 }

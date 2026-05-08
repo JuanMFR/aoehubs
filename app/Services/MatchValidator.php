@@ -43,81 +43,76 @@ class MatchValidator
         $humans = $parsed['humans'] ?? [];
 
         // 1) Game completed: si la iteracion del body no llego a EOF, hubo
-        //    truncate (alt+f4 mid-game, crash, etc). En esos casos no contamos
-        //    como match valido — el cron de forfeit/abandon decide.
+        //    truncate (alt+f4 mid-game, crash, etc).
         if (isset($parsed['completed']) && $parsed['completed'] === false) {
-            $reason = $parsed['truncate_reason'] ?? 'sin razon';
-            $errors[] = "replay truncado/incompleto: {$reason}";
+            $errors[] = "La partida no terminó correctamente (cierre forzado o crash).";
         }
 
         // 2) Cantidad de humans esperada. PvP real = 2; vs bot = 1 humano + AI.
         $expectedHumans = ($match->host->isBot() || $match->opponent?->isBot()) ? 1 : 2;
         if (count($humans) !== $expectedHumans) {
-            $errors[] = "se esperaban {$expectedHumans} humano(s) en el replay, encontrados " . count($humans);
+            $errors[] = "El replay no muestra la cantidad correcta de jugadores reales.";
         }
 
-        // 3) Civs: validamos que las dos civs esperadas (segun civ draft)
-        //    aparezcan en los humans del replay. Sin identity matching (no
-        //    sabemos cual humano es host vs opponent porque profile_id != steam_id),
-        //    asi que comparamos como sets ordenados. Robusto a swap de slots.
+        // 3) Civs: validamos que las civs del replay coincidan con las del draft.
         $civDraft = $match->civDraft;
         if ($civDraft !== null && ! empty($civDraft->host_final_civ) && ! empty($civDraft->opponent_final_civ)) {
             $expected = [self::norm($civDraft->host_final_civ), self::norm($civDraft->opponent_final_civ)];
             sort($expected);
-
-            // Para matches vs bot, solo el humano (host real) deberia tener su civ del draft.
-            // Para PvP, ambas civs tienen que aparecer.
             $actualCivs = array_filter(array_map(fn ($h) => self::norm($h['civilization'] ?? ''), $humans));
 
             if ($expectedHumans === 1) {
-                // Solo validamos que la civ del humano matchee al host_final_civ
                 $hostExpected = self::norm($civDraft->host_final_civ);
                 $humanCiv     = $actualCivs[0] ?? null;
                 if ($humanCiv !== $hostExpected) {
-                    $errors[] = "host: civ esperada '{$civDraft->host_final_civ}', jugo '" . ($humans[0]['civilization'] ?? '?') . "'";
+                    $played = $humans[0]['civilization'] ?? '?';
+                    $errors[] = "Jugaste con {$played} en lugar de {$civDraft->host_final_civ} (la civ que elegiste en el draft).";
                 }
             } else {
                 $actualSorted = $actualCivs;
                 sort($actualSorted);
                 if ($expected !== $actualSorted) {
-                    $errors[] = "civs esperadas [" . implode(', ', $expected) . "], encontradas [" . implode(', ', $actualSorted) . "]";
+                    $errors[] = "Las civilizaciones del replay no coinciden con las del draft.";
                 }
             }
         }
 
-        // 4) Mapa: comparamos contra `map_name` (derivado de rms_map_id ->
-        //    DE_MAP_NAMES, ej: 33 -> "Nomad"). NO usamos `rms_filename` porque
-        //    cuando hay un map pack del Steam Workshop cargado, el archivo
-        //    RMS literal puede ser "LP Arena.rms" o similar — el id estándar
-        //    sigue siendo el correcto.
+        // 4) Mapa: comparamos contra `map_name`.
         $mapDraft = $match->mapDraft;
         if ($mapDraft !== null && ! empty($mapDraft->final_map)) {
             $expectedMap = self::norm($mapDraft->final_map);
             $actualMap   = self::norm($parsed['map_name'] ?? '');
 
             if ($actualMap === '') {
-                $errors[] = "el replay no tiene map_name (rms_map_id=" . ($parsed['rms_map_id'] ?? '?') . ")";
+                $errors[] = "No se pudo identificar el mapa en el replay.";
             } elseif ($actualMap !== $expectedMap) {
-                $errors[] = "mapa esperado '{$mapDraft->final_map}', jugado '{$parsed['map_name']}'";
+                $errors[] = "Se jugó en {$parsed['map_name']} en lugar de {$mapDraft->final_map} (el mapa elegido en el draft).";
             }
         }
 
-        // 5) Mods: ranked es vanilla. El campo `mod` del replay deberia estar vacio.
+        // 5) Mods: ranked es vanilla.
         $mod = $parsed['mod'] ?? '';
         if ($mod !== '' && $mod !== null) {
-            $errors[] = "el replay tiene mod cargado: '{$mod}'";
+            $errors[] = "La partida se jugó con un mod cargado ({$mod}). Ranked tiene que ser vanilla.";
         }
 
         // 6) Settings de ranked. Cada key tiene que matchear el valor esperado.
+        $settingLabels = [
+            'population_limit' => 'el límite de población',
+            'lock_teams'       => 'el lock de equipos',
+            'lock_speed'       => 'el lock de velocidad',
+            'cheats'           => 'los cheats',
+            'treaty_length'    => 'el tiempo de tratado',
+            'multiplayer'      => 'el modo multiplayer',
+        ];
         $settings = $parsed['settings'] ?? [];
         foreach (self::RANKED_SETTINGS as $key => $expected) {
             if (! array_key_exists($key, $settings) || $settings[$key] === null) {
-                continue; // skip si el campo no esta poblado
+                continue;
             }
             if ($settings[$key] !== $expected) {
-                $actual = is_bool($settings[$key]) ? ($settings[$key] ? 'true' : 'false') : (string) $settings[$key];
-                $exp    = is_bool($expected)        ? ($expected        ? 'true' : 'false') : (string) $expected;
-                $errors[] = "setting '{$key}': esperado {$exp}, encontrado {$actual}";
+                $label = $settingLabels[$key] ?? "la configuración '{$key}'";
+                $errors[] = "Se modificó {$label} respecto a la configuración estándar de ranked.";
             }
         }
 

@@ -5,10 +5,10 @@
 @section('content')
 <div class="space-y-6">
     <div>
-        <a href="{{ route('admin.matches') }}" class="text-sm text-steam hover:underline">← Volver a matches</a>
+        <a href="{{ route('admin.matches') }}" class="text-sm text-accent hover:underline">← Volver a matches</a>
         <h1 class="mt-2 text-2xl font-bold flex items-center gap-3">
             Match #{{ $match->id }}
-            <span class="badge badge-{{ $match->status }}">{{ $match->status }}</span>
+            <span class="badge badge-{{ $match->status }}">{{ __($match->status) }}</span>
         </h1>
     </div>
 
@@ -19,13 +19,20 @@
                 <strong>Match activa.</strong>
                 <span class="text-zinc-400">Forzar cancel la marca como abandoned sin afectar rating.</span>
             </div>
-            <form method="POST" action="{{ route('admin.matches.cancel', $match->id) }}" onsubmit="return confirm('¿Cancelar match #{{ $match->id }}?');">
-                @csrf
-                <button type="submit" class="rounded border border-red-700 bg-red-950 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900 transition-colors">
-                    Forzar cancel
-                </button>
-            </form>
+            <button type="button"
+                    onclick="document.getElementById('admin-cancel-{{ $match->id }}').showModal()"
+                    class="rounded border border-red-700 bg-red-950 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900 transition-colors">
+                Forzar cancel
+            </button>
         </div>
+        <x-confirm-modal id="admin-cancel-{{ $match->id }}"
+                         title="Forzar cancel del match #{{ $match->id }}"
+                         :action="route('admin.matches.cancel', $match->id)"
+                         confirmLabel="Sí, marcar como abandoned"
+                         :danger="true">
+            <p>El match queda como <code class="font-mono text-zinc-300">abandoned</code>, sin afectar rating de los jugadores.</p>
+            <p class="text-xs text-zinc-500">Esta acción no aplica anti-griefing — es admin override puro.</p>
+        </x-confirm-modal>
     @endif
 
     @if ($match->status === 'pending_validation')
@@ -62,7 +69,7 @@
                             @if ($match->host->isBot())
                                 <span class="text-amber-400">Bot Dev</span>
                             @else
-                                <a href="{{ route('users.show', $match->host->steam_id) }}" class="hover:text-steam transition-colors">{{ $match->host->persona_name ?? Str::limit($match->host->steam_id, 14) }}</a>
+                                <a href="{{ route('users.show', $match->host->steam_id) }}" class="hover:text-accent transition-colors">{{ $match->host->persona_name ?? Str::limit($match->host->steam_id, 14) }}</a>
                             @endif
                             {{ $isHostWinner ? '🏆' : '' }}
                         </div>
@@ -93,7 +100,7 @@
                             @elseif ($match->opponent->isBot())
                                 <span class="text-amber-400">Bot Dev</span>
                             @else
-                                <a href="{{ route('users.show', $match->opponent->steam_id) }}" class="hover:text-steam transition-colors">{{ $match->opponent->persona_name ?? Str::limit($match->opponent->steam_id, 14) }}</a>
+                                <a href="{{ route('users.show', $match->opponent->steam_id) }}" class="hover:text-accent transition-colors">{{ $match->opponent->persona_name ?? Str::limit($match->opponent->steam_id, 14) }}</a>
                             @endif
                             {{ $isOppWinner ? '🏆' : '' }}
                         </div>
@@ -148,7 +155,7 @@
         <section>
             <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Map draft</h2>
             <div class="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm">
-                <div><strong>Final:</strong> <span class="text-emerald-400">{{ $match->mapDraft->final_map ?? '(en curso)' }}</span></div>
+                <div><strong>Final:</strong> <span class="text-emerald-400">{{ $match->mapDraft->final_map ? __($match->mapDraft->final_map) : '(en curso)' }}</span></div>
                 <div class="mt-1 text-zinc-400"><strong>Bans:</strong> {{ count($match->mapDraft->bans_json ?? []) }}</div>
             </div>
         </section>
@@ -159,8 +166,8 @@
             <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Civ draft</h2>
             <div class="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 text-sm space-y-1">
                 <div><strong>Phase:</strong> {{ $match->civDraft->phase }}</div>
-                <div><strong>Host final:</strong> {{ $match->civDraft->host_final_civ ?? '—' }}</div>
-                <div><strong>Opp final:</strong> {{ $match->civDraft->opponent_final_civ ?? '—' }}</div>
+                <div><strong>Host final:</strong> {{ $match->civDraft->host_final_civ ? __($match->civDraft->host_final_civ) : '—' }}</div>
+                <div><strong>Opp final:</strong> {{ $match->civDraft->opponent_final_civ ? __($match->civDraft->opponent_final_civ) : '—' }}</div>
             </div>
         </section>
     @endif

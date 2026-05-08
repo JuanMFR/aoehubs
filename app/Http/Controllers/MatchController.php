@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GameMatch;
+use App\Services\CooldownService;
 use App\Services\Matchmaking;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ class MatchController extends Controller
         $resultFilter  = $request->input('result');
         $opponentQ     = trim((string) $request->input('opponent'));
 
-        $query = GameMatch::with(['host', 'opponent', 'mapDraft'])
+        $query = GameMatch::with(['host', 'opponent', 'mapDraft', 'civDraft'])
             ->where(function ($q) use ($userId) {
                 $q->where('host_user_id', $userId)
                   ->orWhere('opponent_user_id', $userId);
@@ -39,6 +40,10 @@ class MatchController extends Controller
             GameMatch::STATUS_ABANDONED,
         ], true)) {
             $query->where('status', $statusFilter);
+        } else {
+            // Por default ocultamos abandoned — no aportan info al historial.
+            // Para verlos hay que filtrar explicitamente por status=abandoned.
+            $query->where('status', '!=', GameMatch::STATUS_ABANDONED);
         }
 
         // Filtro por resultado: 'win' / 'loss' / 'walkover'. Solo aplica a
@@ -184,17 +189,40 @@ class MatchController extends Controller
     }
 
     /**
-     * Cancela manualmente una match pendiente.
+     * Cancela manualmente una match en draft o pending. Aplica anti-griefing.
+     *
+     * Reglas:
+     *   - Solo participantes (host u opponent) pueden cancelar
+     *   - Status valido: drafting, pending. No se permite cancelar in_progress
+     *     desde aca (eso lo maneja el heartbeat timeout con KIND_MID_GAME_DISCONNECT)
+     *   - Cancelar mid-draft → KIND_DRAFT_ABANDON
+     *   - Cancelar pending  → KIND_LOBBY_ABORT (el draft termino, abandonan antes de jugar)
+     *   - El otro jugador NO recibe penalty. Su flow detecta status=abandoned via
+     *     polling y se redirige al detalle del match.
      */
     public function cancel(Request $request, int $id)
     {
+        $userId = $request->user()->id;
+
         $match = GameMatch::where('id', $id)
-            ->where('host_user_id', $request->user()->id)
-            ->where('status', GameMatch::STATUS_PENDING)
+            ->where(function ($q) use ($userId) {
+                $q->where('host_user_id', $userId)->orWhere('opponent_user_id', $userId);
+            })
+            ->whereIn('status', [GameMatch::STATUS_DRAFTING, GameMatch::STATUS_PENDING])
             ->firstOrFail();
 
-        $match->update(['status' => GameMatch::STATUS_ABANDONED]);
+        $offenseKind = $match->status === GameMatch::STATUS_DRAFTING
+            ? CooldownService::KIND_DRAFT_ABANDON
+            : CooldownService::KIND_LOBBY_ABORT;
 
-        return redirect()->route('matches.index')->with('flash', "Match #{$id} cancelada.");
+        $match->update(['status' => GameMatch::STATUS_ABANDONED]);
+        $cdSecs = CooldownService::record($request->user(), $match, $offenseKind);
+
+        if ($cdSecs > 0) {
+            // Tono firme — el contador grande de la card lo va a comunicar mejor.
+            return redirect()->route('dashboard')->with('error', 'Has abandonado demasiadas partidas.');
+        }
+
+        return redirect()->route('dashboard')->with('flash', 'Partida cancelada.');
     }
 }

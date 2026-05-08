@@ -5,11 +5,20 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
-/* Tokens del design system. Extiende Tailwind con la marca Steam. */
+/* Tokens del design system. */
 @theme {
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
     --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
+    /* Acento principal de AoEHubs: dorado noble sobre antracita.
+       Usado para CTAs, focus, drafts, badges activos. */
+    --color-accent: #D4AF37;
+    --color-accent-dark: #1a1a1a;
+    --color-accent-hover: #E5C158;
+
+    /* Steam brand color. Reservado EXCLUSIVAMENTE para el boton "Iniciar
+       sesion con Steam" (azul oficial Steam, semantico — no usar para
+       acentos generales de la app). */
     --color-steam: #66c0f4;
     --color-steam-dark: #1b2838;
     --color-steam-hover: #5aa8d6;
@@ -30,10 +39,10 @@
     .civ.selectable { @apply cursor-pointer; }
 
     .map.selectable:hover,
-    .civ.selectable:hover { @apply bg-zinc-700 border-steam; }
+    .civ.selectable:hover { @apply bg-zinc-700 border-accent; }
 
     .map.selected,
-    .civ.selected { background: rgb(27 40 56 / 0.9); @apply border-steam text-steam font-semibold; }
+    .civ.selected { background: rgb(26 26 26 / 0.9); @apply border-accent text-accent font-semibold; }
 
     .map.banned,
     .civ.banned { @apply bg-red-950/40 text-zinc-600 line-through cursor-not-allowed; }
@@ -46,15 +55,24 @@
 
     /* ── Banner de turno/fase (drafts) ──────────────────────────────────── */
     .turn-banner, .banner {
-        @apply rounded-lg border-l-4 border-zinc-600 bg-zinc-900/70 px-6 py-4
+        @apply rounded-lg border-2 border-zinc-700 bg-zinc-900/70 px-6 py-4
                flex justify-between items-center gap-4 transition-colors;
     }
-    .turn-banner.your-turn,
-    .banner.action       { @apply border-steam; }
-    .turn-banner.their-turn,
-    .banner.waiting      { @apply border-zinc-600 text-zinc-400; }
-    .turn-banner.completed,
-    .banner.completed    { @apply border-emerald-400 bg-emerald-950/40; }
+
+    /* Map draft turn states */
+    .turn-banner.your-turn   { @apply border-accent bg-accent-dark/40 text-accent; }
+    .turn-banner.their-turn  { @apply border-zinc-700 bg-zinc-900/50 text-zinc-400; }
+    .turn-banner.completed   { @apply border-emerald-500 bg-emerald-950/40 text-emerald-200; }
+
+    /* Civ draft phases — color-coded por accion. Picks=verde (tu eleccion),
+       bans=rojo (cortando picks del rival), final=dorado (decision final). */
+    .banner.picking          { @apply border-emerald-500 bg-emerald-950/40 text-emerald-200; }
+    .banner.banning          { @apply border-red-500 bg-red-950/40 text-red-200; }
+    .banner.finalizing       { @apply border-accent bg-accent-dark/50 text-accent; }
+    .banner.waiting          { @apply border-zinc-700 bg-zinc-900/50 text-zinc-400; }
+    .banner.completed        { @apply border-emerald-500 bg-emerald-950/40 text-emerald-200; }
+    /* Legacy alias (action) por si queda algun uso viejo. */
+    .banner.action           { @apply border-accent bg-accent-dark/40 text-accent; }
 
     .turn-banner .timer,
     .banner .timer {
@@ -68,10 +86,17 @@
 
     /* ── Botones del confirm (civ draft) ────────────────────────────────── */
     .btn-confirm {
-        @apply rounded bg-steam px-6 py-2.5 font-semibold text-steam-dark
-               hover:bg-steam-hover transition-colors disabled:bg-zinc-800
+        @apply rounded bg-accent px-6 py-2.5 font-semibold text-accent-dark
+               hover:bg-accent-hover transition-colors disabled:bg-zinc-800
                disabled:text-zinc-500 disabled:cursor-not-allowed;
     }
+
+    /* ── Award tier styles ──────────────────────────────────────────────── */
+    .tier-bronze    { @apply border-amber-700 bg-amber-950/30 text-amber-500; }
+    .tier-silver    { @apply border-zinc-400 bg-zinc-800/40 text-zinc-300; }
+    .tier-gold      { @apply border-accent bg-accent-dark/40 text-accent; }
+    .tier-platinum  { @apply border-sky-400 bg-sky-950/30 text-sky-300; }
+    .tier-prismatic { @apply border-emerald-400 bg-emerald-950/30 text-emerald-300; }
 
     /* ── Status badges (matches/index) ──────────────────────────────────── */
     .badge {
@@ -93,6 +118,11 @@
         from { opacity: 0; transform: translateY(4px); }
         to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* Carousel: ocultamos la scrollbar nativa del track porque tenemos
+       indicadores visuales propios y el auto-advance hace el trabajo. */
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
 /* Scrollbars en dark mode */

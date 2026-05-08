@@ -1,192 +1,197 @@
 @extends('layouts.app')
 
-@section('title', 'Mis matches — AoE2 Rank')
+@section('title', 'Mis matches — AoEHubs')
 
 @section('content')
-<div class="space-y-8">
+<div class="space-y-6">
     <div>
         <h1 class="text-2xl font-bold">Mis matches</h1>
-        <p class="mt-1 text-sm text-zinc-500">Historial completo de tus partidas.</p>
+        <p class="mt-1 text-sm text-zinc-500">Historial de tus partidas. Click en cualquier fila para ver el detalle.</p>
     </div>
 
-    {{-- Historial --}}
-    <section>
-        <div class="flex items-baseline justify-between gap-2 mb-3">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Historial</h2>
-            <span class="text-xs text-zinc-500">{{ $matches->total() }} {{ Str::plural('match', $matches->total()) }}</span>
-        </div>
-
-        {{-- Filtros --}}
-        <form method="GET" class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 sm:p-4 mb-4 grid sm:grid-cols-4 gap-3">
+    {{-- Filtros — collapsible asi no satura la vista por default --}}
+    <details class="group rounded-lg border border-zinc-800 bg-zinc-900/40">
+        <summary class="cursor-pointer select-none flex items-center justify-between gap-2 px-4 py-3 text-sm">
+            <span class="font-medium text-zinc-300">
+                <span class="inline-block transition-transform group-open:rotate-90">▶</span>
+                Filtros
+                @if ($statusFilter || $resultFilter || $opponentQ)
+                    <span class="ml-2 text-xs px-2 py-0.5 rounded bg-accent-dark text-accent">activos</span>
+                @endif
+            </span>
+            <span class="text-xs text-zinc-500">{{ $matches->total() }} {{ Str::plural('partida', $matches->total()) }}</span>
+        </summary>
+        <form method="GET" class="grid sm:grid-cols-4 gap-3 p-4 border-t border-zinc-800">
             <div>
                 <label class="block text-xs font-medium text-zinc-500 mb-1">Estado</label>
-                <select name="status" class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm focus:border-steam focus:outline-none">
+                <select name="status" class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm focus:border-accent focus:outline-none">
                     <option value="">Todos</option>
                     @foreach ($statuses as $st)
-                        <option value="{{ $st }}" {{ $statusFilter === $st ? 'selected' : '' }}>{{ $st }}</option>
+                        <option value="{{ $st }}" {{ $statusFilter === $st ? 'selected' : '' }}>{{ __($st) }}</option>
                     @endforeach
                 </select>
             </div>
             <div>
                 <label class="block text-xs font-medium text-zinc-500 mb-1">Resultado</label>
-                <select name="result" class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm focus:border-steam focus:outline-none">
+                <select name="result" class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm focus:border-accent focus:outline-none">
                     <option value="">Todos</option>
-                    <option value="win"      {{ $resultFilter === 'win'      ? 'selected' : '' }}>WIN</option>
-                    <option value="loss"     {{ $resultFilter === 'loss'     ? 'selected' : '' }}>LOSS</option>
+                    <option value="win"      {{ $resultFilter === 'win'      ? 'selected' : '' }}>Victorias</option>
+                    <option value="loss"     {{ $resultFilter === 'loss'     ? 'selected' : '' }}>Derrotas</option>
                     <option value="walkover" {{ $resultFilter === 'walkover' ? 'selected' : '' }}>Walkover</option>
                 </select>
             </div>
             <div class="sm:col-span-2">
-                <label class="block text-xs font-medium text-zinc-500 mb-1">Rival (nombre o Steam ID)</label>
-                <input type="text" name="opponent" value="{{ $opponentQ }}" placeholder="Buscar rival..."
-                       class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm focus:border-steam focus:outline-none">
+                <label class="block text-xs font-medium text-zinc-500 mb-1">Rival</label>
+                <input type="text" name="opponent" value="{{ $opponentQ }}" placeholder="Buscar por nombre..."
+                       class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm focus:border-accent focus:outline-none">
             </div>
             <div class="sm:col-span-4 flex gap-2">
-                <button type="submit" class="rounded border border-steam/60 bg-steam-dark px-3 py-1.5 text-sm text-steam hover:bg-steam hover:text-steam-dark transition-colors">
-                    Filtrar
+                <button type="submit" class="rounded border border-accent/60 bg-accent-dark px-3 py-1.5 text-sm text-accent hover:bg-accent hover:text-accent-dark transition-colors">
+                    Aplicar
                 </button>
                 @if ($statusFilter || $resultFilter || $opponentQ)
-                    <a href="{{ route('matches.index') }}" class="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-100">Limpiar filtros</a>
+                    <a href="{{ route('matches.index') }}" class="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-zinc-100">Limpiar</a>
                 @endif
             </div>
         </form>
+    </details>
 
-        @if ($matches->isEmpty())
-            <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 p-12 text-center">
-                @if ($statusFilter || $resultFilter || $opponentQ)
-                    <p class="text-zinc-500">Sin resultados para los filtros aplicados.</p>
-                    <p class="mt-1 text-xs text-zinc-600">Probá <a href="{{ route('matches.index') }}" class="text-steam hover:underline">limpiar filtros</a>.</p>
-                @else
-                    <p class="text-zinc-500">No tenés matches todavía.</p>
-                    <p class="mt-1 text-xs text-zinc-600">Hacé click en "Buscar partida" desde el dashboard para arrancar.</p>
-                @endif
-            </div>
-        @else
-            <div class="overflow-x-auto rounded-lg border border-zinc-800">
-                <table class="w-full text-sm">
-                    <thead class="bg-zinc-900/60">
-                        <tr class="text-left text-xs uppercase tracking-wider text-zinc-500">
-                            <th class="px-3 py-3">ID</th>
-                            <th class="px-3 py-3">vs</th>
-                            <th class="px-3 py-3 hidden lg:table-cell">Lobby</th>
-                            <th class="px-3 py-3 hidden md:table-cell">Servidor</th>
-                            <th class="px-3 py-3">Estado</th>
-                            <th class="px-3 py-3">Resultado</th>
-                            <th class="px-3 py-3 text-right hidden sm:table-cell">ΔRating</th>
-                            <th class="px-3 py-3 hidden lg:table-cell">Replay</th>
-                            <th class="px-3 py-3 hidden md:table-cell">Fecha</th>
-                            <th class="px-3 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-zinc-800">
-                        @foreach ($matches as $m)
-                            @php
-                                $myId  = auth()->id();
-                                $opp   = $m->host_user_id === $myId ? $m->opponent : $m->host;
-                                $oppName = $opp?->persona_name ?? Str::limit($opp?->steam_id ?? '—', 12);
-                                $oppLinkable = $opp && ! $opp->isBot();
-                            @endphp
-                            <tr class="hover:bg-zinc-900/40 transition-colors">
-                                <td class="px-3 py-3 font-mono">
-                                    <a href="{{ route('matches.show', $m->id) }}" class="text-steam hover:underline">#{{ $m->id }}</a>
-                                </td>
-                                <td class="px-3 py-3">
-                                    @if ($oppLinkable)
-                                        <a href="{{ route('users.show', $opp->steam_id) }}" class="flex items-center gap-2 hover:text-steam transition-colors">
-                                            @if ($opp->avatar_url)
-                                                <img src="{{ $opp->avatar_url }}" alt="" class="h-6 w-6 rounded shrink-0">
-                                            @else
-                                                <span class="h-6 w-6 rounded bg-zinc-800 flex items-center justify-center text-xs text-zinc-500 shrink-0">{{ Str::upper(Str::substr($oppName, 0, 1)) }}</span>
-                                            @endif
-                                            <span class="truncate">{{ $oppName }}</span>
-                                        </a>
-                                    @else
-                                        <span class="flex items-center gap-2 text-zinc-400">
-                                            <span class="h-6 w-6 rounded bg-amber-950/40 border border-amber-900 flex items-center justify-center text-xs text-amber-400 shrink-0">B</span>
-                                            <span class="truncate">Bot Dev</span>
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3 font-mono text-xs hidden lg:table-cell">
-                                    @if ($m->lobby_id)
-                                        <a href="aoe2de://0/{{ $m->lobby_id }}" title="Abrir en AoE2 DE" class="text-steam hover:underline">{{ $m->lobby_id }}</a>
-                                    @else
-                                        —
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3 font-mono text-xs hidden md:table-cell">{{ $m->config_json['server'] ?? '—' }}</td>
-                                <td class="px-3 py-3">
-                                    <span class="badge badge-{{ $m->status }}">{{ $m->status }}</span>
-                                    @if ($m->status === 'invalid' && ! empty($m->validation_errors))
-                                        <ul class="mt-1.5 space-y-0.5 list-disc list-inside text-xs text-orange-300">
-                                            @foreach ($m->validation_errors as $err)
-                                                <li>{{ $err }}</li>
-                                            @endforeach
-                                        </ul>
-                                    @elseif ($m->status === 'pending_validation')
-                                        <div class="mt-1 text-xs text-zinc-500">esperando soporte de mgz</div>
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3">
-                                    @if ($m->status === 'completed')
-                                        @php $walkover = $m->replay_path === null; @endphp
-                                        @if ($m->winner_user_id === auth()->id())
-                                            <span class="font-semibold text-emerald-400">WIN</span>
-                                            @if ($walkover)<span class="block text-xs text-zinc-500">por walkover</span>@endif
-                                        @elseif ($m->winner_user_id !== null)
-                                            <span class="font-semibold text-red-400">LOSS</span>
-                                            @if ($walkover)<span class="block text-xs text-zinc-500">forfeit</span>@endif
-                                        @else
-                                            <span class="text-zinc-600">—</span>
-                                        @endif
-                                    @else
-                                        <span class="text-zinc-600">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3 text-right font-mono text-xs hidden sm:table-cell whitespace-nowrap">
-                                    @php
-                                        $isHost = $m->host_user_id === auth()->id();
-                                        $before = $isHost ? $m->host_rating_before : $m->opponent_rating_before;
-                                        $change = $isHost ? $m->host_rating_change : $m->opponent_rating_change;
-                                    @endphp
-                                    @if ($change !== null)
-                                        <span class="text-zinc-500">{{ round($before) }}</span>
-                                        @if ($change > 0)
-                                            <span class="text-emerald-400">+{{ round($change) }}</span>
-                                        @elseif ($change < 0)
-                                            <span class="text-red-400">{{ round($change) }}</span>
-                                        @else
-                                            <span class="text-zinc-500">±0</span>
-                                        @endif
-                                    @else
-                                        <span class="text-zinc-600">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3 font-mono text-xs hidden lg:table-cell">
-                                    @if ($m->replay_filename)
-                                        <span title="{{ $m->replay_filename }}">{{ Str::limit($m->replay_filename, 24) }}</span>
-                                        <span class="text-zinc-500">({{ round($m->replay_size / 1024) }} KB)</span>
-                                    @else
-                                        <span class="text-zinc-600">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-3 py-3 font-mono text-xs text-zinc-500 hidden md:table-cell whitespace-nowrap">{{ $m->created_at->format('Y-m-d H:i') }}</td>
-                                <td class="px-3 py-3">
-                                    @if ($m->status === 'pending')
-                                        <form method="POST" action="{{ route('matches.cancel', $m->id) }}" onsubmit="return confirm('¿Cancelar match #{{ $m->id }}?');">
-                                            @csrf
-                                            <button class="rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950 transition-colors" type="submit">Cancelar</button>
-                                        </form>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+    {{-- Lista --}}
+    @if ($matches->isEmpty())
+        <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-900/30 p-12 text-center">
+            @if ($statusFilter || $resultFilter || $opponentQ)
+                <p class="text-zinc-500">Sin resultados para los filtros aplicados.</p>
+                <p class="mt-1 text-xs text-zinc-600">Probá <a href="{{ route('matches.index') }}" class="text-accent hover:underline">limpiar filtros</a>.</p>
+            @else
+                <p class="text-zinc-500">Todavía no jugaste ninguna partida.</p>
+                <p class="mt-1 text-xs text-zinc-600">Andá al <a href="{{ route('dashboard') }}" class="text-accent hover:underline">dashboard</a> y apretá "Buscar partida".</p>
+            @endif
+        </div>
+    @else
+        <div class="rounded-lg border border-zinc-800 bg-zinc-900/30 divide-y divide-zinc-800 overflow-hidden">
+            @foreach ($matches as $m)
+                @php
+                    $myId  = auth()->id();
+                    $isHost = $m->host_user_id === $myId;
+                    $opp   = $isHost ? $m->opponent : $m->host;
+                    $oppName = $opp ? $opp->displayName() : '—';
+                    $myCiv = $m->civDraft ? ($isHost ? $m->civDraft->host_final_civ : $m->civDraft->opponent_final_civ) : null;
+                    $oppCiv = $m->civDraft ? ($isHost ? $m->civDraft->opponent_final_civ : $m->civDraft->host_final_civ) : null;
+                    $map = $m->mapDraft?->final_map;
+                    $change = $isHost ? $m->host_rating_change : $m->opponent_rating_change;
+                    $won = $m->winner_user_id === $myId;
+                    $lost = $m->winner_user_id !== null && $m->winner_user_id !== $myId;
+                    $walkover = $m->status === 'completed' && $m->replay_path === null;
+                @endphp
 
-            <div class="mt-4">{{ $matches->links() }}</div>
-        @endif
-    </section>
+                <div class="relative grid grid-cols-12 gap-3 items-center px-4 py-3 hover:bg-zinc-900/60 transition-colors">
+                    {{-- Stretched link: cubre toda la fila pero deja activos elementos con z-index superior. --}}
+                    <a href="{{ route('matches.show', $m->id) }}"
+                       class="absolute inset-0 z-0"
+                       aria-label="Ver detalle del match contra {{ $oppName }}"></a>
+
+                    {{-- Rival --}}
+                    <div class="col-span-12 sm:col-span-4 flex items-center gap-3 min-w-0 relative z-10 pointer-events-none">
+                        @if ($opp && $opp->avatar_url)
+                            <img src="{{ $opp->avatar_url }}" alt="" class="h-10 w-10 rounded-lg border border-zinc-700 shrink-0">
+                        @else
+                            <div class="h-10 w-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-sm text-zinc-400 shrink-0">
+                                {{ Str::upper(Str::substr($oppName, 0, 1)) }}
+                            </div>
+                        @endif
+                        <div class="min-w-0">
+                            <div class="font-medium truncate flex items-center gap-2">
+                                {{ $oppName }}
+                                @if ($opp?->isBot())
+                                    <span class="text-[10px] px-1 rounded bg-zinc-800 text-zinc-500 uppercase">bot</span>
+                                @endif
+                            </div>
+                            @if ($m->status !== 'completed')
+                                <div class="mt-0.5">
+                                    <span class="badge badge-{{ $m->status }}">{{ __($m->status) }}</span>
+                                </div>
+                            @else
+                                <div class="text-xs text-zinc-500 font-mono">{{ $m->created_at->diffForHumans() }}</div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Map + Civ --}}
+                    <div class="col-span-6 sm:col-span-3 text-sm relative z-10 pointer-events-none">
+                        <div class="flex items-center gap-2 text-zinc-200 truncate">
+                            @if ($map)
+                                <x-map-icon :name="$map" class="h-5 w-5 rounded shrink-0 text-[8px]" />
+                            @endif
+                            <span class="truncate">{{ $map ? __($map) : '—' }}</span>
+                        </div>
+                        @if ($myCiv)
+                            <div class="text-xs text-zinc-500 truncate flex items-center gap-1 mt-0.5">
+                                <x-civ-icon :name="$myCiv" class="h-4 w-4 rounded shrink-0 text-[8px]" />
+                                <span class="text-zinc-400">{{ __($myCiv) }}</span>
+                                @if ($oppCiv)
+                                    <span class="text-zinc-600">vs</span>
+                                    <x-civ-icon :name="$oppCiv" class="h-4 w-4 rounded shrink-0 text-[8px]" />
+                                    <span>{{ __($oppCiv) }}</span>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Resultado + ΔRating --}}
+                    <div class="col-span-6 sm:col-span-3 text-right sm:text-left relative z-10 pointer-events-none">
+                        @if ($won)
+                            <div class="text-lg font-bold text-emerald-400 leading-tight">WIN</div>
+                        @elseif ($lost)
+                            <div class="text-lg font-bold text-red-400 leading-tight">LOSS</div>
+                        @elseif ($m->status === 'completed')
+                            <div class="text-zinc-600">—</div>
+                        @endif
+
+                        @if ($change !== null && $change != 0)
+                            <div class="text-xs font-mono mt-0.5">
+                                @if ($change > 0)
+                                    <span class="text-emerald-400">+{{ round($change) }}</span>
+                                @elseif ($change < 0)
+                                    <span class="text-red-400">{{ round($change) }}</span>
+                                @endif
+                                <span class="text-zinc-600">rating</span>
+                            </div>
+                        @endif
+
+                        @if ($walkover)
+                            <div class="text-[10px] text-zinc-500 italic">{{ $won ? 'walkover' : 'forfeit' }}</div>
+                        @endif
+                    </div>
+
+                    {{-- Acciones (cancel solo en pending) --}}
+                    <div class="col-span-12 sm:col-span-2 flex sm:justify-end gap-2 relative z-20">
+                        @if ($m->status === 'pending')
+                            <button type="button"
+                                    onclick="event.stopPropagation(); document.getElementById('cancel-row-{{ $m->id }}').showModal()"
+                                    class="rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950 transition-colors">
+                                Cancelar
+                            </button>
+                        @endif
+                    </div>
+
+                    {{-- Modales — fuera del flujo visual pero dentro de la fila por context --}}
+                    @if ($m->status === 'pending')
+                        <x-confirm-modal id="cancel-row-{{ $m->id }}"
+                                         title="¿Cancelar match?"
+                                         :action="route('matches.cancel', $m->id)"
+                                         confirmLabel="Sí, abandonar"
+                                         cancelLabel="No"
+                                         :danger="true">
+                            <p>Vas a abandonar la partida.</p>
+                            <p class="text-accent">El tiempo de tu rival también es valioso.</p>
+                            <p class="text-xs text-zinc-500">Si lo hacés repetidamente vas a quedar bloqueado para buscar partida durante un tiempo.</p>
+                        </x-confirm-modal>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+
+        <div class="mt-4">{{ $matches->links() }}</div>
+    @endif
 </div>
 @endsection

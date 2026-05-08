@@ -32,7 +32,7 @@
                     @foreach ($element as $page => $url)
                         @if ($page == $paginator->currentPage())
                             <span aria-current="page"
-                                  class="px-3 py-1.5 border border-steam bg-steam-dark text-steam font-semibold">{{ $page }}</span>
+                                  class="px-3 py-1.5 border border-accent bg-accent-dark text-accent font-semibold">{{ $page }}</span>
                         @else
                             <a href="{{ $url }}"
                                class="px-3 py-1.5 border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 transition-colors">{{ $page }}</a>

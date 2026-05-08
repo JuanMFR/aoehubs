@@ -44,6 +44,11 @@ class LeaderboardController extends Controller
                 DB::raw('COALESCE(w.wins, 0) as wins'),
                 DB::raw('COALESCE(p.played, 0) as played'),
             )
+            // Awards prestigiosos (platinum + prismatic) para mostrar inline
+            // junto al nombre. Limita a tier >=4 para no saturar la fila.
+            ->with(['awards' => function ($q) {
+                $q->whereIn('tier', [4, 5])->orderByDesc('tier');
+            }])
             ->orderByDesc('users.rating')
             ->limit(50)
             ->get();

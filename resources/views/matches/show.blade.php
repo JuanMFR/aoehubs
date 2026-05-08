@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Match #' . $match->id . ' — AoE2 Rank')
+@section('title', 'Match #' . $match->id . ' — AoEHubs')
 
 @section('content')
 @php
@@ -20,10 +20,10 @@
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-            <a href="{{ route('matches.index') }}" class="text-sm text-steam hover:underline">← Mis matches</a>
+            <a href="{{ route('matches.index') }}" class="text-sm text-accent hover:underline">← Mis matches</a>
             <h1 class="mt-2 text-2xl font-bold flex items-center gap-3 flex-wrap">
                 Match <span class="font-mono text-zinc-500">#{{ $match->id }}</span>
-                <span class="badge badge-{{ $match->status }}">{{ $match->status }}</span>
+                <span class="badge badge-{{ $match->status }}">{{ __($match->status) }}</span>
                 @if ($walkover)
                     <span class="badge badge-completed">walkover</span>
                 @endif
@@ -61,9 +61,9 @@
             <h2 class="font-semibold text-purple-300 mb-2">Drafts en curso</h2>
             <p class="text-sm text-zinc-300 mb-4">Volvé al draft para completar la selección.</p>
             <div class="flex gap-2">
-                <a href="{{ route('drafts.maps.show', $match->id) }}" class="rounded border border-steam/60 bg-steam-dark px-4 py-2 text-sm text-steam hover:bg-steam hover:text-steam-dark transition-colors">→ Map draft</a>
+                <a href="{{ route('drafts.maps.show', $match->id) }}" class="rounded border border-accent/60 bg-accent-dark px-4 py-2 text-sm text-accent hover:bg-accent hover:text-accent-dark transition-colors">→ Map draft</a>
                 @if ($match->civDraft)
-                    <a href="{{ route('drafts.civs.show', $match->id) }}" class="rounded border border-steam/60 bg-steam-dark px-4 py-2 text-sm text-steam hover:bg-steam hover:text-steam-dark transition-colors">→ Civ draft</a>
+                    <a href="{{ route('drafts.civs.show', $match->id) }}" class="rounded border border-accent/60 bg-accent-dark px-4 py-2 text-sm text-accent hover:bg-accent hover:text-accent-dark transition-colors">→ Civ draft</a>
                 @endif
             </div>
         </div>
@@ -75,13 +75,12 @@
             <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Selecciones del draft</h2>
             <div class="grid sm:grid-cols-3 gap-3">
                 {{-- Mapa --}}
-                <div class="rounded-xl border-2 border-steam/40 bg-gradient-to-br from-steam-dark/30 to-zinc-900/50 p-4 sm:p-5">
-                    <div class="text-xs uppercase tracking-wider text-steam/80 font-semibold mb-3">Mapa</div>
+                <div class="rounded-xl border-2 border-accent/40 bg-gradient-to-br from-accent-dark/30 to-zinc-900/50 p-4 sm:p-5">
+                    <div class="text-xs uppercase tracking-wider text-accent/80 font-semibold mb-3">Mapa</div>
                     <div class="flex items-center gap-3">
-                        <div class="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg bg-steam-dark border border-steam/40 flex items-center justify-center text-steam font-bold text-xl sm:text-2xl">
-                            {{ $mapName ? Str::upper(Str::substr($mapName, 0, 1)) : '?' }}
-                        </div>
-                        <div class="font-bold text-xl sm:text-2xl text-steam truncate">{{ $mapName ?? '—' }}</div>
+                        <x-map-icon :name="$mapName"
+                                    class="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg" />
+                        <div class="font-bold text-xl sm:text-2xl text-accent truncate">{{ $mapName ? __($mapName) : '—' }}</div>
                     </div>
                 </div>
 
@@ -89,10 +88,9 @@
                 <div class="rounded-xl border-2 border-emerald-700/60 bg-emerald-950/30 p-4 sm:p-5">
                     <div class="text-xs uppercase tracking-wider text-emerald-400/80 font-semibold mb-3">Tu civilización</div>
                     <div class="flex items-center gap-3">
-                        <div class="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-300 font-bold text-xl sm:text-2xl">
-                            {{ $myCivPick ? Str::upper(Str::substr($myCivPick, 0, 1)) : '?' }}
-                        </div>
-                        <div class="font-bold text-xl sm:text-2xl text-emerald-300 truncate">{{ $myCivPick ?? '—' }}</div>
+                        <x-civ-icon :name="$myCivPick"
+                                    class="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg" />
+                        <div class="font-bold text-xl sm:text-2xl text-emerald-300 truncate">{{ $myCivPick ? __($myCivPick) : '—' }}</div>
                     </div>
                 </div>
 
@@ -100,55 +98,95 @@
                 <div class="rounded-xl border-2 border-red-800/60 bg-red-950/30 p-4 sm:p-5">
                     <div class="text-xs uppercase tracking-wider text-red-400/80 font-semibold mb-3">Civ del rival</div>
                     <div class="flex items-center gap-3">
-                        <div class="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg bg-red-950 border border-red-900 flex items-center justify-center text-red-300 font-bold text-xl sm:text-2xl">
-                            {{ $oppCivPick ? Str::upper(Str::substr($oppCivPick, 0, 1)) : '?' }}
-                        </div>
-                        <div class="font-bold text-xl sm:text-2xl text-red-300 truncate">{{ $oppCivPick ?? '—' }}</div>
+                        <x-civ-icon :name="$oppCivPick"
+                                    class="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg" />
+                        <div class="font-bold text-xl sm:text-2xl text-red-300 truncate">{{ $oppCivPick ? __($oppCivPick) : '—' }}</div>
                     </div>
                 </div>
             </div>
         </section>
     @endif
 
-    {{-- Pre-partida: lobby info + checklist --}}
+    {{-- Pre-partida: rol del jugador + instrucciones --}}
     @if ($match->status === 'pending')
-        <section class="rounded-lg border border-amber-700/40 bg-amber-950/10 p-4 sm:p-5">
-            <h2 class="font-semibold text-amber-300 flex items-center gap-2 mb-3">
-                <span class="text-lg">⚠</span> Antes de iniciar la partida en AoE2
-            </h2>
-            <ul class="space-y-2 text-sm text-zinc-300">
-                <li class="flex items-start gap-2">
-                    <span class="text-amber-400">1.</span>
-                    <span>
-                        @if ($isHost)
-                            El companion ya armó la sala. Esperá al rival en el lobby.
-                        @else
-                            El link al lobby debería abrirse automáticamente cuando el host esté listo.
-                            @if ($match->lobby_id)
-                                Si no se abrió, <a href="aoe2de://0/{{ $match->lobby_id }}" class="text-steam hover:underline">click acá para entrar</a>.
-                            @endif
-                        @endif
+        <section class="rounded-xl border-2 {{ $isHost ? 'border-accent/40 bg-accent-dark/10' : 'border-sky-700/40 bg-sky-950/10' }} p-5 sm:p-6">
+            <div class="flex flex-wrap items-center gap-3 mb-4">
+                @if ($isHost)
+                    <span class="px-3 py-1 rounded bg-accent text-accent-dark font-bold text-xs uppercase tracking-wider">
+                        Sos host
                     </span>
-                </li>
-                <li class="flex items-start gap-2">
-                    <span class="text-amber-400">2.</span>
-                    <span>Verificá que el mapa esté en <strong class="text-steam">{{ $mapName ?? '—' }}</strong></span>
-                </li>
-                <li class="flex items-start gap-2">
-                    <span class="text-amber-400">3.</span>
-                    <span>Elegí tu civilización: <strong class="text-emerald-300">{{ $myCivPick ?? '—' }}</strong></span>
-                </li>
-                <li class="flex items-start gap-2">
-                    <span class="text-amber-400">4.</span>
-                    <span>Una vez listos los dos, inicien partida</span>
-                </li>
-            </ul>
-            @if ($match->lobby_id)
-                <div class="mt-4 pt-3 border-t border-amber-900/40 text-xs text-zinc-500 font-mono">
-                    Lobby ID: <a href="aoe2de://0/{{ $match->lobby_id }}" class="text-steam hover:underline">{{ $match->lobby_id }}</a>
-                    · Servidor: {{ $match->config_json['server'] ?? '—' }}
-                </div>
+                    <span class="text-zinc-300 text-sm">Vos armás la sala — tu rival entra cuando esté lista.</span>
+                @else
+                    <span class="px-3 py-1 rounded bg-sky-600 text-sky-50 font-bold text-xs uppercase tracking-wider">
+                        Sos joiner
+                    </span>
+                    <span class="text-zinc-300 text-sm">Tu rival está armando la sala — vos solo esperás.</span>
+                @endif
+            </div>
+
+            <h3 class="text-xs font-semibold uppercase tracking-wider {{ $isHost ? 'text-accent' : 'text-sky-300' }} mb-3">
+                Qué tenés que hacer
+            </h3>
+
+            @if ($isHost)
+                <ol class="space-y-2.5 text-sm text-zinc-300">
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-dark border border-accent/60 text-accent font-bold text-xs">1</span>
+                        <span>Abrí <strong>Age of Empires 2 DE</strong> y verificá que el companion esté corriendo.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-dark border border-accent/60 text-accent font-bold text-xs">2</span>
+                        <span>Andá a <strong>Multijugador → Organizar partida</strong>.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-dark border border-accent/60 text-accent font-bold text-xs">3</span>
+                        <span>El companion va a completar los datos de creación de la sala (nombre, password, server) y los settings del lobby (población, lock teams, victoria, etc.). <strong class="text-zinc-100">No toques nada</strong> mientras lo hace.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-dark border border-accent/60 text-accent font-bold text-xs">4</span>
+                        <span>Una vez en el lobby, <strong class="text-zinc-100">elegí el mapa: <span class="text-accent">{{ $mapName ? __($mapName) : '—' }}</span></strong>. El companion no setea el mapa — eso lo tenés que hacer vos.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-dark border border-accent/60 text-accent font-bold text-xs">5</span>
+                        <span>Cuando entre tu rival, <strong class="text-zinc-100">elegí tu civilización: <span class="text-emerald-300">{{ $myCivPick ? __($myCivPick) : '—' }}</span></strong>.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-dark border border-accent/60 text-accent font-bold text-xs">6</span>
+                        <span>Cuando estén ambos listos, arranquen la partida.</span>
+                    </li>
+                </ol>
+            @else
+                <ol class="space-y-2.5 text-sm text-zinc-300">
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-950 border border-sky-700 text-sky-300 font-bold text-xs">1</span>
+                        <span>Abrí <strong>Age of Empires 2 DE</strong> y verificá que el companion esté corriendo.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-950 border border-sky-700 text-sky-300 font-bold text-xs">2</span>
+                        <span>Esperá. El companion va a abrir el link a la sala automáticamente cuando el host la termine de armar.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-950 border border-sky-700 text-sky-300 font-bold text-xs">3</span>
+                        <span>Cuando AoE2 te pida la contraseña de la sala, el companion la va a poner solo.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-950 border border-sky-700 text-sky-300 font-bold text-xs">4</span>
+                        <span>Una vez en el lobby, <strong class="text-zinc-100">elegí tu civilización: <span class="text-emerald-300">{{ $myCivPick ? __($myCivPick) : '—' }}</span></strong>. El mapa lo setea el host.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-950 border border-sky-700 text-sky-300 font-bold text-xs">5</span>
+                        <span>Cuando estén ambos listos, arranquen la partida.</span>
+                    </li>
+                </ol>
             @endif
+
+            <div class="mt-5 pt-4 border-t {{ $isHost ? 'border-accent/20' : 'border-sky-900/40' }} text-xs text-zinc-500 grid sm:grid-cols-3 gap-2">
+                <div>Mapa: <strong class="text-zinc-300">{{ $mapName ? __($mapName) : '—' }}</strong></div>
+                <div>Tu civ: <strong class="text-zinc-300">{{ $myCivPick ? __($myCivPick) : '—' }}</strong></div>
+                @if ($match->lobby_id)
+                    <div>Lobby: <a href="aoe2de://0/{{ $match->lobby_id }}" class="text-accent hover:underline font-mono">{{ $match->lobby_id }}</a></div>
+                @endif
+            </div>
         </section>
     @endif
 
@@ -166,102 +204,136 @@
         </section>
     @endif
 
-    {{-- Replay parseado (cuando completed o invalid) --}}
-    @if (! empty($match->parsed_metadata))
-        @php $md = $match->parsed_metadata; @endphp
+    {{-- Historial del draft — bans de mapa + civ picks/bans --}}
+    @php
+        $mapBans = $match->mapDraft?->bans_json ?? [];
+        $cd = $match->civDraft;
+        $hasDraftHistory = !empty($mapBans) || ($cd && (!empty($cd->host_picks_json) || !empty($cd->opponent_picks_json)));
+
+        // Picks/bans desde la perspectiva del user.
+        $myPicks   = $cd ? ($isHost ? $cd->host_picks_json     : $cd->opponent_picks_json)     : null;
+        $oppPicks  = $cd ? ($isHost ? $cd->opponent_picks_json : $cd->host_picks_json)         : null;
+        // host_bans_json son los bans QUE EL HOST hizo contra picks del opponent.
+        // Si yo soy host, mis bans afectan a oppPicks; los bans contra mí están en opponent_bans_json.
+        $myBansAgainstOpp = $cd ? ($isHost ? $cd->host_bans_json     : $cd->opponent_bans_json) : null;
+        $oppBansAgainstMe = $cd ? ($isHost ? $cd->opponent_bans_json : $cd->host_bans_json)     : null;
+    @endphp
+
+    @if ($hasDraftHistory)
         <section>
-            <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Datos del replay</h2>
-            <div class="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800 text-sm">
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4">
-                    <div>
-                        <div class="text-xs text-zinc-500 uppercase">Game version</div>
-                        <div class="font-mono">{{ $md['game_version'] ?? '—' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-zinc-500 uppercase">Mapa real</div>
-                        <div>{{ Str::replaceLast('.rms', '', $md['rms_filename'] ?? '—') }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-zinc-500 uppercase">Operaciones</div>
-                        <div class="font-mono">{{ $md['ops_count'] ?? '—' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-zinc-500 uppercase">Mensajes chat</div>
-                        <div class="font-mono">{{ $md['chat_count'] ?? 0 }}</div>
-                    </div>
-                </div>
-
-                {{-- Civs jugadas vs drafted --}}
-                @if (! empty($md['humans']))
-                    <div class="p-4">
-                        <div class="text-xs text-zinc-500 uppercase mb-2">Jugadores en el replay</div>
-                        <div class="space-y-1.5">
-                            @foreach ($md['humans'] as $h)
-                                <div class="font-mono text-sm flex items-center gap-2 flex-wrap">
-                                    <span class="text-zinc-400">slot {{ $h['number'] }}</span>
-                                    <span>{{ $h['name'] }}</span>
-                                    <span class="text-zinc-600">→</span>
-                                    <span class="text-emerald-300">{{ $h['civilization'] ?? 'civ_id=' . $h['civilization_id'] }}</span>
-                                </div>
-                            @endforeach
-                            @foreach ($md['ais'] ?? [] as $ai)
-                                <div class="font-mono text-sm flex items-center gap-2 flex-wrap text-zinc-500">
-                                    <span>slot {{ $ai['number'] }}</span>
-                                    <span>{{ $ai['ai_name'] }} (AI)</span>
-                                    <span>→</span>
-                                    <span>{{ $ai['civilization'] ?? '?' }}</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-
-                {{-- Eventos: resigns + completion --}}
-                <div class="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div>
-                        <div class="text-xs text-zinc-500 uppercase">Terminó natural</div>
-                        <div>{{ ($md['saw_postgame'] ?? false) ? '✓ Sí' : '✗ No (truncado)' }}</div>
-                    </div>
-                    @if (! empty($md['resigned_players']))
+            <details class="group rounded-lg border border-zinc-800 bg-zinc-900/40">
+                <summary class="cursor-pointer select-none flex items-center gap-2 px-4 py-3 text-sm font-medium text-zinc-300 hover:text-zinc-100">
+                    <span class="inline-block transition-transform group-open:rotate-90">▶</span>
+                    Historial del draft
+                </summary>
+                <div class="px-4 pb-4 pt-2 space-y-5 border-t border-zinc-800">
+                    {{-- Map bans en orden cronologico --}}
+                    @if (!empty($mapBans))
+                        @php
+                            $myName    = auth()->user()->displayName();
+                            $rivalUser = $opp;
+                            $rivalName = $rivalUser ? $rivalUser->displayName() : 'Rival';
+                        @endphp
                         <div>
-                            <div class="text-xs text-zinc-500 uppercase">Resigns</div>
-                            <div class="font-mono">slot {{ implode(', ', $md['resigned_players']) }}</div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Mapas baneados</h3>
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach ($mapBans as $b)
+                                    @php $byMe = $b['user_id'] === auth()->id(); @endphp
+                                    <span class="inline-flex items-center gap-1.5 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs">
+                                        <x-map-icon :name="$b['map']" class="h-4 w-4 rounded shrink-0 text-[8px]" />
+                                        <span class="text-[10px] uppercase tracking-wider {{ $byMe ? 'text-emerald-400' : 'text-red-400' }}">
+                                            {{ $byMe ? $myName : $rivalName }}
+                                        </span>
+                                        <span class="line-through text-zinc-400">{{ __($b['map']) }}</span>
+                                    </span>
+                                @endforeach
+                                @if ($mapName)
+                                    <span class="inline-flex items-center gap-1.5 rounded border-2 border-accent bg-accent-dark/40 px-2 py-1 text-xs">
+                                        <x-map-icon :name="$mapName" class="h-4 w-4 rounded shrink-0" />
+                                        <span class="text-[10px] uppercase tracking-wider text-accent">Final</span>
+                                        <span class="text-accent font-semibold">{{ __($mapName) }}</span>
+                                    </span>
+                                @endif
+                            </div>
                         </div>
                     @endif
-                    <div>
-                        <div class="text-xs text-zinc-500 uppercase">Mod cargado</div>
-                        <div>{{ ! empty($md['mod']) ? $md['mod'] : '✓ vanilla' }}</div>
-                    </div>
-                </div>
 
-                {{-- Settings clave (si están raros, ya van a estar en validation_errors igual) --}}
-                @if (! empty($md['settings']))
-                    @php $s = $md['settings']; @endphp
-                    <div class="p-4">
-                        <div class="text-xs text-zinc-500 uppercase mb-2">Settings</div>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-                            <div>pop: <span class="text-zinc-300">{{ $s['population_limit'] ?? '?' }}</span></div>
-                            <div>lock_teams: <span class="text-zinc-300">{{ var_export($s['lock_teams'] ?? null, true) }}</span></div>
-                            <div>lock_speed: <span class="text-zinc-300">{{ var_export($s['lock_speed'] ?? null, true) }}</span></div>
-                            <div>cheats: <span class="text-zinc-300">{{ var_export($s['cheats'] ?? null, true) }}</span></div>
-                            <div>treaty: <span class="text-zinc-300">{{ $s['treaty_length'] ?? '?' }}</span></div>
-                            <div>multiplayer: <span class="text-zinc-300">{{ var_export($s['multiplayer'] ?? null, true) }}</span></div>
-                            <div>shared_explor: <span class="text-zinc-300">{{ var_export($s['shared_exploration'] ?? null, true) }}</span></div>
-                            <div>turbo: <span class="text-zinc-300">{{ var_export($s['turbo_enabled'] ?? null, true) }}</span></div>
+                    {{-- Civ picks/bans --}}
+                    @if ($cd && !empty($myPicks))
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Civilizaciones</h3>
+                            <div class="grid sm:grid-cols-2 gap-3 text-sm">
+                                {{-- Tus picks --}}
+                                <div class="rounded-lg border border-emerald-800/40 bg-emerald-950/10 p-3">
+                                    <div class="text-xs text-emerald-400 mb-2 font-medium">Tus picks</div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach ($myPicks as $civ)
+                                            @php
+                                                $isFinal = $civ === $myCivPick;
+                                                $isBanned = $oppBansAgainstMe && in_array($civ, $oppBansAgainstMe);
+                                            @endphp
+                                            <span @class([
+                                                'inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs',
+                                                'border-2 border-emerald-400 bg-emerald-950/40 text-emerald-300 font-semibold' => $isFinal,
+                                                'border-red-900 bg-zinc-900 text-zinc-500 line-through' => $isBanned,
+                                                'border-zinc-700 bg-zinc-900 text-zinc-300' => !$isFinal && !$isBanned,
+                                            ])>
+                                                <x-civ-icon :name="$civ" class="h-4 w-4 rounded text-[8px]" />
+                                                {{ __($civ) }}
+                                                @if ($isFinal) <span class="ml-1 text-[10px]">✓</span> @endif
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                    @if (!empty($myBansAgainstOpp))
+                                        <div class="mt-3 text-xs text-zinc-500">
+                                            Banneaste del rival:
+                                            <span class="text-red-400">{{ collect($myBansAgainstOpp)->map(fn($c) => __($c))->join(', ') }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                {{-- Picks del rival --}}
+                                <div class="rounded-lg border border-red-900/40 bg-red-950/10 p-3">
+                                    <div class="text-xs text-red-400 mb-2 font-medium">Picks del rival</div>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        @foreach ($oppPicks as $civ)
+                                            @php
+                                                $isFinal = $civ === $oppCivPick;
+                                                $isBanned = $myBansAgainstOpp && in_array($civ, $myBansAgainstOpp);
+                                            @endphp
+                                            <span @class([
+                                                'inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs',
+                                                'border-2 border-red-400 bg-red-950/40 text-red-300 font-semibold' => $isFinal,
+                                                'border-red-900 bg-zinc-900 text-zinc-500 line-through' => $isBanned,
+                                                'border-zinc-700 bg-zinc-900 text-zinc-300' => !$isFinal && !$isBanned,
+                                            ])>
+                                                <x-civ-icon :name="$civ" class="h-4 w-4 rounded text-[8px]" />
+                                                {{ __($civ) }}
+                                                @if ($isFinal) <span class="ml-1 text-[10px]">✓</span> @endif
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                    @if (!empty($oppBansAgainstMe))
+                                        <div class="mt-3 text-xs text-zinc-500">
+                                            Te banneó: <span class="text-red-400">{{ collect($oppBansAgainstMe)->map(fn($c) => __($c))->join(', ') }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                @endif
-            </div>
+                    @endif
+                </div>
+            </details>
         </section>
     @endif
 
     {{-- Validation errors si el match es invalid --}}
     @if ($match->status === 'invalid' && ! empty($match->validation_errors))
         <section>
-            <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Por qué quedó inválida</h2>
+            <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">Esta partida no se contó como ranked</h2>
             <div class="rounded-lg border border-orange-800/50 bg-orange-950/20 p-4">
                 <p class="text-sm text-zinc-300 mb-3">
-                    El replay no pasó la validación de ranked. Sin rating change.
+                    El replay no cumple con las reglas de partidas ranked, así que no hubo cambio de rating.
                 </p>
                 <ul class="list-disc list-inside text-sm text-orange-300 space-y-1">
                     @foreach ($match->validation_errors as $err)
@@ -275,13 +347,22 @@
     {{-- Acciones --}}
     @if ($match->status === 'pending')
         <div class="flex gap-2">
-            <form method="POST" action="{{ route('matches.cancel', $match->id) }}" onsubmit="return confirm('¿Cancelar match #{{ $match->id }}?');">
-                @csrf
-                <button type="submit" class="rounded border border-red-900 bg-red-950/30 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900/40 transition-colors">
-                    Cancelar match
-                </button>
-            </form>
+            <button type="button"
+                    onclick="document.getElementById('cancel-pending-{{ $match->id }}').showModal()"
+                    class="rounded border border-red-900 bg-red-950/30 px-3 py-1.5 text-sm text-red-300 hover:bg-red-900/40 transition-colors">
+                Cancelar match
+            </button>
         </div>
+        <x-confirm-modal id="cancel-pending-{{ $match->id }}"
+                         title="¿Cancelar el match?"
+                         :action="route('matches.cancel', $match->id)"
+                         confirmLabel="Sí, abandonar"
+                         cancelLabel="No, mantener"
+                         :danger="true">
+            <p>Vas a abandonar la partida antes de que arranque.</p>
+            <p class="text-accent">El tiempo de tu rival también es valioso.</p>
+            <p class="text-xs text-zinc-500">Si lo hacés repetidamente vas a quedar bloqueado para buscar partida durante un tiempo.</p>
+        </x-confirm-modal>
     @endif
 
     {{-- Info opponent (con link a su perfil) --}}
@@ -289,7 +370,7 @@
         <section class="text-sm text-zinc-500">
             Rival:
             @if ($oppLinkable)
-                <a href="{{ route('users.show', $opp->steam_id) }}" class="text-steam hover:underline">{{ $opp->persona_name ?? Str::limit($opp->steam_id, 14) }}</a>
+                <a href="{{ route('users.show', $opp->steam_id) }}" class="text-accent hover:underline">{{ $opp->persona_name ?? Str::limit($opp->steam_id, 14) }}</a>
             @else
                 <span>Bot Dev</span>
             @endif

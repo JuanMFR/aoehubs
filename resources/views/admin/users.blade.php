@@ -12,12 +12,13 @@
         <a href="{{ route('admin.overview') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Overview</a>
         <a href="{{ route('admin.users') }}" class="px-3 py-1.5 rounded bg-zinc-800 text-zinc-100">Usuarios</a>
         <a href="{{ route('admin.matches') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Matches</a>
+        <a href="{{ route('admin.seasons') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Seasons</a>
     </nav>
 
     {{-- Search --}}
     <form method="GET" action="{{ route('admin.users') }}" class="flex gap-2">
         <input type="text" name="q" value="{{ $q }}" placeholder="Buscar por nombre o Steam ID..."
-               class="flex-1 rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-steam focus:outline-none">
+               class="flex-1 rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm focus:border-accent focus:outline-none">
         <button type="submit" class="rounded border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 transition-colors">
             Buscar
         </button>
@@ -56,10 +57,10 @@
                                 @if ($u->isBot())
                                     <span>{{ $u->persona_name ?? 'Bot Dev' }}</span>
                                 @else
-                                    <a href="{{ route('users.show', $u->steam_id) }}" class="hover:text-steam transition-colors">{{ $u->persona_name ?? '—' }}</a>
+                                    <a href="{{ route('users.show', $u->steam_id) }}" class="hover:text-accent transition-colors">{{ $u->persona_name ?? '—' }}</a>
                                 @endif
                                 @if ($u->id === auth()->id())
-                                    <span class="text-xs text-steam">(vos)</span>
+                                    <span class="text-xs text-accent">(vos)</span>
                                 @endif
                             </div>
                         </td>

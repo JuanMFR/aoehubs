@@ -12,18 +12,19 @@
         <a href="{{ route('admin.overview') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Overview</a>
         <a href="{{ route('admin.users') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Usuarios</a>
         <a href="{{ route('admin.matches') }}" class="px-3 py-1.5 rounded bg-zinc-800 text-zinc-100">Matches</a>
+        <a href="{{ route('admin.seasons') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Seasons</a>
     </nav>
 
     {{-- Filtros por status --}}
     <div class="flex flex-wrap gap-2 text-sm">
         <a href="{{ route('admin.matches') }}"
-           class="px-3 py-1.5 rounded border {{ ! $status ? 'border-steam bg-steam-dark text-steam' : 'border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900' }}">
+           class="px-3 py-1.5 rounded border {{ ! $status ? 'border-accent bg-accent-dark text-accent' : 'border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900' }}">
             Todos
         </a>
         @foreach ($statuses as $st)
             <a href="{{ route('admin.matches', ['status' => $st]) }}"
-               class="px-3 py-1.5 rounded border {{ $status === $st ? 'border-steam bg-steam-dark text-steam' : 'border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900' }}">
-                {{ $st }}
+               class="px-3 py-1.5 rounded border {{ $status === $st ? 'border-accent bg-accent-dark text-accent' : 'border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900' }}">
+                {{ __($st) }}
             </a>
         @endforeach
     </div>
@@ -47,13 +48,13 @@
                 @forelse ($matches as $m)
                     <tr class="hover:bg-zinc-900/40 transition-colors">
                         <td class="px-3 py-3 font-mono text-zinc-400">
-                            <a href="{{ route('admin.matches.show', $m->id) }}" class="text-steam hover:underline">#{{ $m->id }}</a>
+                            <a href="{{ route('admin.matches.show', $m->id) }}" class="text-accent hover:underline">#{{ $m->id }}</a>
                         </td>
                         <td class="px-3 py-3 text-sm">
                             @if ($m->host->isBot())
                                 <span class="text-amber-400">Bot Dev</span>
                             @else
-                                <a href="{{ route('users.show', $m->host->steam_id) }}" class="hover:text-steam transition-colors">{{ $m->host->persona_name ?? Str::limit($m->host->steam_id, 12) }}</a>
+                                <a href="{{ route('users.show', $m->host->steam_id) }}" class="hover:text-accent transition-colors">{{ $m->host->persona_name ?? Str::limit($m->host->steam_id, 12) }}</a>
                             @endif
                         </td>
                         <td class="px-3 py-3 text-sm">
@@ -62,10 +63,10 @@
                             @elseif ($m->opponent->isBot())
                                 <span class="text-amber-400">Bot Dev</span>
                             @else
-                                <a href="{{ route('users.show', $m->opponent->steam_id) }}" class="hover:text-steam transition-colors">{{ $m->opponent->persona_name ?? Str::limit($m->opponent->steam_id, 12) }}</a>
+                                <a href="{{ route('users.show', $m->opponent->steam_id) }}" class="hover:text-accent transition-colors">{{ $m->opponent->persona_name ?? Str::limit($m->opponent->steam_id, 12) }}</a>
                             @endif
                         </td>
-                        <td class="px-3 py-3"><span class="badge badge-{{ $m->status }}">{{ $m->status }}</span></td>
+                        <td class="px-3 py-3"><span class="badge badge-{{ $m->status }}">{{ __($m->status) }}</span></td>
                         <td class="px-3 py-3 text-sm hidden md:table-cell">
                             @if ($m->winner)
                                 <span class="text-emerald-400">{{ $m->winner->persona_name ?? Str::limit($m->winner->steam_id, 10) }}</span>
@@ -77,12 +78,18 @@
                         <td class="px-3 py-3 font-mono text-xs text-zinc-500 hidden sm:table-cell whitespace-nowrap">{{ $m->created_at->format('Y-m-d H:i') }}</td>
                         <td class="px-3 py-3 text-right whitespace-nowrap">
                             @if (in_array($m->status, ['pending', 'in_progress', 'drafting']))
-                                <form method="POST" action="{{ route('admin.matches.cancel', $m->id) }}" class="inline" onsubmit="return confirm('¿Forzar cancel del match #{{ $m->id }}?');">
-                                    @csrf
-                                    <button type="submit" class="rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950 transition-colors">
-                                        Cancelar
-                                    </button>
-                                </form>
+                                <button type="button"
+                                        onclick="document.getElementById('admin-cancel-row-{{ $m->id }}').showModal()"
+                                        class="rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950 transition-colors">
+                                    Cancelar
+                                </button>
+                                <x-confirm-modal id="admin-cancel-row-{{ $m->id }}"
+                                                 title="Forzar cancel match #{{ $m->id }}"
+                                                 :action="route('admin.matches.cancel', $m->id)"
+                                                 confirmLabel="Sí, abandonar"
+                                                 :danger="true">
+                                    <p>Marca el match como <code class="font-mono text-zinc-300">abandoned</code> sin penalty para los jugadores (admin override).</p>
+                                </x-confirm-modal>
                             @endif
                             @if ($m->status === 'pending_validation')
                                 <form method="POST" action="{{ route('admin.matches.reprocess', $m->id) }}" class="inline">

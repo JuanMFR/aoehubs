@@ -17,6 +17,7 @@
         <a href="{{ route('admin.overview') }}" class="px-3 py-1.5 rounded bg-zinc-800 text-zinc-100">Overview</a>
         <a href="{{ route('admin.users') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Usuarios</a>
         <a href="{{ route('admin.matches') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Matches</a>
+        <a href="{{ route('admin.seasons') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Seasons</a>
     </nav>
 
     {{-- Top metrics --}}
@@ -53,7 +54,7 @@
                 @foreach (['drafting', 'pending', 'in_progress', 'completed', 'pending_validation', 'invalid', 'abandoned'] as $st)
                     <a href="{{ route('admin.matches', ['status' => $st]) }}"
                        class="flex items-center justify-between rounded px-3 py-2 hover:bg-zinc-800 transition-colors">
-                        <span class="badge badge-{{ $st }}">{{ $st }}</span>
+                        <span class="badge badge-{{ $st }}">{{ __($st) }}</span>
                         <span class="font-mono">{{ $statusCounts[$st] ?? 0 }}</span>
                     </a>
                 @endforeach
@@ -66,7 +67,7 @@
         <section>
             <div class="flex items-baseline justify-between mb-3">
                 <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Últimos matches</h2>
-                <a href="{{ route('admin.matches') }}" class="text-xs text-steam hover:underline">ver todos →</a>
+                <a href="{{ route('admin.matches') }}" class="text-xs text-accent hover:underline">ver todos →</a>
             </div>
             <div class="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
                 @forelse ($recentMatches as $m)
@@ -77,7 +78,7 @@
                             <span class="text-zinc-600 mx-1">vs</span>
                             <span class="text-sm">{{ $m->opponent->persona_name ?? Str::limit($m->opponent->steam_id ?? '—', 10) }}</span>
                         </div>
-                        <span class="badge badge-{{ $m->status }}">{{ $m->status }}</span>
+                        <span class="badge badge-{{ $m->status }}">{{ __($m->status) }}</span>
                     </a>
                 @empty
                     <div class="px-4 py-6 text-center text-sm text-zinc-500">Sin matches.</div>
@@ -89,7 +90,7 @@
         <section>
             <div class="flex items-baseline justify-between mb-3">
                 <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500">Últimos usuarios</h2>
-                <a href="{{ route('admin.users') }}" class="text-xs text-steam hover:underline">ver todos →</a>
+                <a href="{{ route('admin.users') }}" class="text-xs text-accent hover:underline">ver todos →</a>
             </div>
             <div class="rounded-lg border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
                 @forelse ($recentUsers as $u)

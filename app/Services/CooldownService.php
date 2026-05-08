@@ -31,6 +31,7 @@ class CooldownService
 {
     public const KIND_LOBBY_ABORT         = 'lobby_abort';
     public const KIND_MID_GAME_DISCONNECT = 'mid_game_disconnect';
+    public const KIND_DRAFT_ABANDON       = 'draft_abandon';
 
     private const WINDOW_HOURS = 24;
 

@@ -13,6 +13,7 @@ class GameMatch extends Model
     protected $table = 'matches';
 
     protected $fillable = [
+        'season_id',
         'host_user_id',
         'opponent_user_id',
         'config_json',
@@ -74,6 +75,30 @@ class GameMatch extends Model
     public const STATUS_COMPLETED          = 'completed';
     public const STATUS_INVALID            = 'invalid';
     public const STATUS_ABANDONED          = 'abandoned';
+
+    /**
+     * Auto-asigna la season activa al crear un match si no se paso una
+     * explicita. Asi no hay que tocar todos los call-sites de Matchmaking.
+     * Si no hay season activa (ej. entre el cierre de S1 y la apertura de
+     * S2), el match queda con season_id=null hasta que el admin asocie
+     * manualmente o cree la nueva season.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $match) {
+            if ($match->season_id === null) {
+                $current = Season::current();
+                if ($current !== null) {
+                    $match->season_id = $current->id;
+                }
+            }
+        });
+    }
+
+    public function season(): BelongsTo
+    {
+        return $this->belongsTo(Season::class);
+    }
 
     public function host(): BelongsTo
     {

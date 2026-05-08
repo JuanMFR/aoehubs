@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -59,5 +60,28 @@ class User extends Authenticatable
     public function isBot(): bool
     {
         return $this->steam_id === self::BOT_STEAM_ID;
+    }
+
+    /**
+     * Nombre a mostrar — prioriza persona_name (vino del Steam Web API), y si
+     * no esta disponible cae a "Player {ultimos 6 chars del SteamID64}".
+     * Evita los "Bienvenido, jugador" feos cuando STEAM_API_KEY no esta
+     * configurado o el refresh aun no corrio.
+     */
+    public function displayName(): string
+    {
+        if (! empty($this->persona_name)) return $this->persona_name;
+        if ($this->isBot()) return 'Bot Dev';
+        return 'Player ' . substr($this->steam_id ?? '', -6);
+    }
+
+    public function awards(): HasMany
+    {
+        return $this->hasMany(UserAward::class);
+    }
+
+    public function seasonStats(): HasMany
+    {
+        return $this->hasMany(SeasonStat::class);
     }
 }

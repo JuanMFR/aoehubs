@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Leaderboard — AoE2 Rank')
+@section('title', 'Leaderboard — AoEHubs')
 
 @section('content')
 <div class="space-y-6">
@@ -33,10 +33,10 @@
                                     : ($rank === 3 ? 'text-orange-400' : 'text-zinc-500'));
                         $rankWeight = $rank <= 3 ? 'font-bold' : 'font-medium';
                     @endphp
-                    <tr class="{{ $isMe ? 'bg-steam-dark/40' : 'hover:bg-zinc-900/40' }} transition-colors">
+                    <tr class="{{ $isMe ? 'bg-accent-dark/40' : 'hover:bg-zinc-900/40' }} transition-colors">
                         <td class="px-4 py-3 font-mono {{ $rankColor }} {{ $rankWeight }}">{{ $rank }}</td>
                         <td class="px-4 py-3">
-                            <a href="{{ route('users.show', $u->steam_id) }}" class="flex items-center gap-2 hover:text-steam transition-colors">
+                            <a href="{{ route('users.show', $u->steam_id) }}" class="flex items-center gap-2 hover:text-accent transition-colors">
                                 @if ($u->avatar_url)
                                     <img src="{{ $u->avatar_url }}" alt="" class="h-6 w-6 rounded shrink-0">
                                 @else
@@ -46,7 +46,14 @@
                                 @endif
                                 <span>{{ $u->persona_name ?? Str::limit($u->steam_id, 12) }}</span>
                                 @if ($isMe)
-                                    <span class="text-xs text-steam">(vos)</span>
+                                    <span class="text-xs text-accent">(vos)</span>
+                                @endif
+                                @if ($u->awards->isNotEmpty())
+                                    <span class="flex items-center gap-1 ml-1">
+                                        @foreach ($u->awards->take(3) as $a)
+                                            <x-award-mini :award="$a" />
+                                        @endforeach
+                                    </span>
                                 @endif
                             </a>
                         </td>

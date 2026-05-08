@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'AoE2 Rank')</title>
+    <title>@yield('title', 'AoEHubs')</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,8 +19,8 @@
     <header class="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/95 backdrop-blur">
         <nav class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-2 group">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded bg-steam-dark text-steam font-bold text-sm group-hover:bg-steam group-hover:text-steam-dark transition-colors">A2</span>
-                <span class="font-semibold tracking-tight">AoE2 Rank</span>
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded bg-accent-dark text-accent font-bold text-sm group-hover:bg-accent group-hover:text-accent-dark transition-colors">A2</span>
+                <span class="font-semibold tracking-tight">AoEHubs</span>
             </a>
 
             <div class="hidden sm:flex items-center gap-1 text-sm">
@@ -43,20 +43,28 @@
                         Admin
                     </a>
                 @endif
+                <a href="{{ route('companion') }}"
+                   class="px-3 py-1.5 rounded transition-colors border {{ $route === 'companion' ? 'bg-accent text-accent-dark border-accent' : 'border-accent/40 bg-accent-dark/40 text-accent hover:bg-accent-dark/80' }}">
+                    Descargar companion
+                </a>
             </div>
 
             <div class="flex items-center gap-3">
-                <div class="hidden sm:flex flex-col items-end leading-tight">
-                    <span class="text-sm">{{ auth()->user()->persona_name ?? '—' }}</span>
-                    <span class="text-xs text-zinc-500 font-mono">{{ round(auth()->user()->rating) }} rating</span>
-                </div>
-                @if (auth()->user()->avatar_url)
-                    <img src="{{ auth()->user()->avatar_url }}" alt="" class="h-8 w-8 rounded-full border border-zinc-700">
-                @else
-                    <div class="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs text-zinc-500">
-                        {{ Str::upper(Str::substr(auth()->user()->persona_name ?? 'P', 0, 1)) }}
+                <a href="{{ route('users.show', auth()->user()->steam_id) }}"
+                   class="flex items-center gap-3 group" title="Mi perfil">
+                    <div class="hidden sm:flex flex-col items-end leading-tight">
+                        <span class="text-sm group-hover:text-accent transition-colors">{{ auth()->user()->displayName() }}</span>
+                        <span class="text-xs text-zinc-500 font-mono">{{ round(auth()->user()->rating) }} rating</span>
                     </div>
-                @endif
+                    @if (auth()->user()->avatar_url)
+                        <img src="{{ auth()->user()->avatar_url }}" alt=""
+                             class="h-8 w-8 rounded-full border border-zinc-700 group-hover:border-accent transition-colors">
+                    @else
+                        <div class="h-8 w-8 rounded-full bg-zinc-800 border border-zinc-700 group-hover:border-accent flex items-center justify-center text-xs text-zinc-500 group-hover:text-accent transition-colors">
+                            {{ Str::upper(Str::substr(auth()->user()->displayName(), 0, 1)) }}
+                        </div>
+                    @endif
+                </a>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit"
@@ -69,9 +77,9 @@
 
         {{-- Nav mobile (visible <sm) --}}
         <div class="sm:hidden flex justify-around border-t border-zinc-900 text-sm">
-            <a href="{{ route('dashboard') }}" class="flex-1 text-center py-2 {{ $route === 'dashboard' ? 'text-steam border-b-2 border-steam' : 'text-zinc-400' }}">Dashboard</a>
-            <a href="{{ route('matches.index') }}" class="flex-1 text-center py-2 {{ str_starts_with($route ?? '', 'matches.') ? 'text-steam border-b-2 border-steam' : 'text-zinc-400' }}">Matches</a>
-            <a href="{{ route('leaderboard') }}" class="flex-1 text-center py-2 {{ $route === 'leaderboard' ? 'text-steam border-b-2 border-steam' : 'text-zinc-400' }}">Ranking</a>
+            <a href="{{ route('dashboard') }}" class="flex-1 text-center py-2 {{ $route === 'dashboard' ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">Dashboard</a>
+            <a href="{{ route('matches.index') }}" class="flex-1 text-center py-2 {{ str_starts_with($route ?? '', 'matches.') ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">Matches</a>
+            <a href="{{ route('leaderboard') }}" class="flex-1 text-center py-2 {{ $route === 'leaderboard' ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">Ranking</a>
             @if (auth()->user()->isAdmin())
                 <a href="{{ route('admin.overview') }}" class="flex-1 text-center py-2 {{ str_starts_with($route ?? '', 'admin.') ? 'text-amber-300 border-b-2 border-amber-400' : 'text-amber-400' }}">Admin</a>
             @endif
@@ -81,11 +89,15 @@
     <header class="border-b border-zinc-800/80 bg-zinc-950/95">
         <nav class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
             <a href="{{ route('home') }}" class="flex items-center gap-2">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded bg-steam-dark text-steam font-bold text-sm">A2</span>
-                <span class="font-semibold tracking-tight">AoE2 Rank</span>
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded bg-accent-dark text-accent font-bold text-sm">A2</span>
+                <span class="font-semibold tracking-tight">AoEHubs</span>
             </a>
             <div class="flex items-center gap-3">
                 <a href="{{ route('leaderboard') }}" class="text-sm text-zinc-400 hover:text-zinc-100">Leaderboard</a>
+                <a href="{{ route('companion') }}"
+                   class="text-sm border border-accent/40 bg-accent-dark/40 text-accent hover:bg-accent-dark/80 px-3 py-1.5 rounded transition-colors">
+                    Descargar companion
+                </a>
                 <a href="{{ route('login') }}" class="text-sm bg-steam-dark border border-steam text-steam hover:bg-steam hover:text-steam-dark px-3 py-1.5 rounded transition-colors font-semibold">Iniciar sesión con Steam</a>
             </div>
         </nav>
@@ -115,9 +127,13 @@
     </main>
 
     <footer class="mt-12 border-t border-zinc-900 text-xs text-zinc-600">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between gap-1">
-            <span>AoE2 Rank — beta</span>
-            <span>Plataforma ranked competitiva 1v1 para Age of Empires 2 DE</span>
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between gap-2">
+            <span>AoEHubs — beta</span>
+            <div class="flex gap-4">
+                <a href="{{ route('companion') }}" class="hover:text-zinc-400 transition-colors">Descargar companion</a>
+                <span class="text-zinc-700 hidden sm:inline">·</span>
+                <span>Plataforma ranked competitiva 1v1 para AoE2 DE</span>
+            </div>
         </div>
     </footer>
 

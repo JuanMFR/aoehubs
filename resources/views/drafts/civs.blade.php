@@ -1,25 +1,34 @@
 @extends('layouts.app')
 
-@section('title', 'Civ Draft #' . $match->id . ' — AoE2 Rank')
+@section('title', 'Civ Draft #' . $match->id . ' — AoEHubs')
 
 @section('content')
+@php
+    $rival = auth()->id() === $match->host_user_id ? $match->opponent : $match->host;
+@endphp
 <div class="space-y-6">
     <div>
         <h1 class="text-2xl font-bold">Civ Draft <span class="text-zinc-500 font-mono text-lg">#{{ $match->id }}</span></h1>
         <p id="phase-desc" class="mt-1 text-sm text-zinc-500">Cargando...</p>
     </div>
 
+    @if ($rival)
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-stretch">
+            <x-player-card :user="auth()->user()" variant="self" />
+            <div class="flex sm:flex-col items-center justify-center text-2xl sm:text-3xl font-black text-zinc-700 tracking-widest py-2 sm:py-0">VS</div>
+            <x-player-card :user="$rival" variant="rival" />
+        </div>
+    @endif
+
     {{-- Mapa elegido en el draft anterior. Se muestra arriba para tenerlo
          siempre presente al elegir civs. Cuando agreguemos miniaturas, va
          la imagen del mapa acá tambien. --}}
     @if ($match->mapDraft && $match->mapDraft->final_map)
         <div class="rounded-lg border border-emerald-800/40 bg-gradient-to-r from-emerald-950/30 to-zinc-900/50 px-4 py-3 flex items-center gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-emerald-950 text-emerald-300 font-bold">
-                {{ Str::upper(Str::substr($match->mapDraft->final_map, 0, 1)) }}
-            </div>
+            <x-map-icon :name="$match->mapDraft->final_map" class="h-10 w-10 shrink-0 rounded" />
             <div class="flex-1 min-w-0">
                 <div class="text-xs uppercase tracking-wider text-zinc-500">Mapa de la partida</div>
-                <div class="font-semibold text-emerald-300 truncate">{{ $match->mapDraft->final_map }}</div>
+                <div class="font-semibold text-emerald-300 truncate">{{ __($match->mapDraft->final_map) }}</div>
             </div>
         </div>
     @endif
@@ -80,14 +89,35 @@
             </div>
             <div class="text-zinc-400">
                 Te llevamos al detalle en <span id="redirect-countdown" class="font-mono text-zinc-200 font-semibold">3</span>s
-                <a href="{{ route('matches.show', $match->id) }}" class="ml-2 text-zinc-500 hover:text-steam transition-colors text-xs">o ir ahora →</a>
+                <a href="{{ route('matches.show', $match->id) }}" class="ml-2 text-zinc-500 hover:text-accent transition-colors text-xs">o ir ahora →</a>
             </div>
         </div>
     </div>
+
+    {{-- Cancel match — anti-griefing penalty aplica --}}
+    <div class="flex justify-end pt-2">
+        <button type="button"
+                onclick="document.getElementById('cancel-match-modal').showModal()"
+                class="text-sm text-zinc-500 hover:text-red-400 transition-colors">
+            Cancelar partida
+        </button>
+    </div>
+
+    <x-confirm-modal id="cancel-match-modal"
+                     title="¿Cancelar la partida?"
+                     :action="route('matches.cancel', $match->id)"
+                     confirmLabel="Sí, abandonar"
+                     cancelLabel="Volver al draft"
+                     :danger="true">
+        <p>Vas a abandonar la partida.</p>
+        <p class="text-accent">El tiempo de tu rival también es valioso.</p>
+        <p class="text-xs text-zinc-500">Si lo hacés repetidamente vas a quedar bloqueado para buscar partida durante un tiempo.</p>
+    </x-confirm-modal>
 </div>
 @endsection
 
 @push('scripts')
+@include('partials.translations-js')
 <script>
     const matchId  = {{ $match->id }};
     const csrf     = document.querySelector('meta[name="csrf-token"]').content;
@@ -99,11 +129,32 @@
     let busy = false;
     let civEls = {};
 
+    // Reemplaza el contenido de un contenedor con la imagen de la civ.
+    // Si la imagen no existe (404), cae al placeholder de 1 letra.
+    function setCivIcon(elId, civName) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.innerHTML = '';
+        if (!civName) { el.textContent = '?'; return; }
+
+        const img = document.createElement('img');
+        img.src = `/images/civs/${civName.toLowerCase()}.png`;
+        img.alt = civName;
+        img.className = 'h-full w-full object-contain';
+        img.onerror = () => { el.textContent = civName[0].toUpperCase(); };
+        el.appendChild(img);
+    }
+
     async function loadState() {
         try {
             const r = await fetch(stateUrl, { headers: { 'Accept': 'application/json' }});
             if (!r.ok) return;
             const data = await r.json();
+            // Si el match se abandono (rival canceló), redirigir al detalle.
+            if (data.match_status === 'abandoned') {
+                window.location.href = `/matches/${matchId}`;
+                return;
+            }
             currentState = data;
             pool = data.pool;
             render(data);
@@ -133,8 +184,22 @@
         civEls = {};
         for (const civ of pool) {
             const el = document.createElement('div');
-            el.className = 'civ';
-            el.textContent = civ;
+            el.className = 'civ flex flex-col items-center gap-1';
+
+            // Icono — si no existe el archivo el browser muestra alt vacio,
+            // mantenemos visible el texto debajo igualmente.
+            const img = document.createElement('img');
+            img.src = `/images/civs/${civ.toLowerCase()}.png`;
+            img.alt = '';
+            img.className = 'h-12 w-12 object-contain';
+            img.loading = 'lazy';
+            img.onerror = () => img.remove();
+            el.appendChild(img);
+
+            const txt = document.createElement('span');
+            txt.textContent = window.t(civ);
+            el.appendChild(txt);
+
             grid.appendChild(el);
             civEls[civ] = el;
         }
@@ -234,12 +299,10 @@
             // Mostrar las cards de resultado (tu civ / civ del rival)
             const ns = document.getElementById('next-step');
             ns.classList.remove('hidden');
-            document.getElementById('my-final-civ').textContent  = state.my_final;
-            document.getElementById('opp-final-civ').textContent = state.opp_final;
-            // Placeholder del icono = primera letra de la civ. Cuando metamos
-            // miniaturas, reemplazar el textContent por una <img>.
-            document.getElementById('my-civ-icon').textContent  = state.my_final  ? state.my_final[0].toUpperCase() : '?';
-            document.getElementById('opp-civ-icon').textContent = state.opp_final ? state.opp_final[0].toUpperCase() : '?';
+            document.getElementById('my-final-civ').textContent  = window.t(state.my_final);
+            document.getElementById('opp-final-civ').textContent = window.t(state.opp_final);
+            setCivIcon('my-civ-icon',  state.my_final);
+            setCivIcon('opp-civ-icon', state.opp_final);
 
             startRedirectCountdown();
         } else if (myDone && !oppDone) {
@@ -252,10 +315,12 @@
             bannerTxt.textContent = 'Avanzando...';
             confirmBtn.disabled = true;
         } else {
-            banner.className = 'banner action';
+            // Banner color-coded por fase: verde=picks (tu eleccion),
+            // rojo=bans (cortando picks del rival), dorado=final.
+            banner.className = `banner ${state.phase}`;
             const phaseAction = {
                 picking:    `Elegí ${needCount} civilizaciones.`,
-                banning:    `Baneá ${needCount} civilizaciones de las del rival.`,
+                banning:    `Baneá ${needCount} civilizaciones del rival.`,
                 finalizing: `Elegí ${needCount} de las civilizaciones que te quedaron.`,
             };
             bannerTxt.textContent = phaseAction[state.phase];

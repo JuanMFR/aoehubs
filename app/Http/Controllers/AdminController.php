@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Api\CompanionApiController;
 use App\Models\GameMatch;
 use App\Models\QueueEntry;
+use App\Models\Season;
 use App\Models\User;
+use App\Services\SeasonService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -148,4 +151,73 @@ class AdminController extends Controller
         return back()->with('flash', "Match #{$match->id} reprocesada → {$newStatus}.");
     }
 
+    /**
+     * Lista de seasons + UI de gestion (editar ends_at + boton cerrar+abrir
+     * la siguiente). Las seasons cerradas se ven en read-only abajo del todo.
+     */
+    public function seasons()
+    {
+        $current  = Season::current();
+        $upcoming = Season::where('status', Season::STATUS_UPCOMING)->orderBy('id')->get();
+        $closed   = Season::where('status', Season::STATUS_CLOSED)->orderByDesc('id')->limit(20)->get();
+
+        $userCount = User::where('steam_id', '!=', User::BOT_STEAM_ID)->count();
+        $matchCount = $current ? $current->matches()->where('status', GameMatch::STATUS_COMPLETED)->count() : 0;
+
+        return view('admin.seasons', compact('current', 'upcoming', 'closed', 'userCount', 'matchCount'));
+    }
+
+    /**
+     * Edita la fecha planificada de fin de la season activa. Solo
+     * actualiza informacion — el cierre real lo dispara closeSeason().
+     */
+    public function updateSeasonEndsAt(Request $request, Season $season)
+    {
+        $data = $request->validate([
+            'ends_at' => ['nullable', 'date', 'after:now'],
+        ]);
+
+        $endsAt = $data['ends_at'] ? Carbon::parse($data['ends_at'])->endOfDay() : null;
+        $season->update(['ends_at' => $endsAt]);
+
+        return back()->with('flash', "Fecha de cierre actualizada: " . ($endsAt?->toDateString() ?? 'sin fecha'));
+    }
+
+    /**
+     * Cierra la season activa y abre la siguiente con los parametros
+     * provistos. Es la accion mas destructiva del admin — afecta el
+     * rating de todos los users. La UI hace doble confirmacion.
+     */
+    public function closeSeason(Request $request, Season $season, SeasonService $service)
+    {
+        if (!$season->isActive()) {
+            return back()->with('error', "Season #{$season->id} no esta activa.");
+        }
+
+        $data = $request->validate([
+            'next_name'   => ['required', 'string', 'max:60'],
+            'next_slug'   => ['required', 'string', 'max:40', 'alpha_dash'],
+            'next_ends_at'=> ['nullable', 'date', 'after:now'],
+            'factor'      => ['required', 'numeric', 'min:0', 'max:1'],
+            'base'        => ['required', 'numeric', 'min:500', 'max:3000'],
+            'confirm'     => ['accepted'],
+        ]);
+
+        $endsAt = $data['next_ends_at'] ? Carbon::parse($data['next_ends_at'])->endOfDay() : null;
+
+        try {
+            $next = $service->closeAndStartNext(
+                $season,
+                $data['next_name'],
+                $data['next_slug'],
+                $endsAt,
+                ['factor' => (float) $data['factor'], 'base' => (float) $data['base']],
+            );
+        } catch (\Throwable $e) {
+            return back()->with('error', "Error cerrando season: " . $e->getMessage());
+        }
+
+        return redirect()->route('admin.seasons')
+            ->with('flash', "Season #{$season->id} cerrada. Season #{$next->id} '{$next->name}' activa.");
+    }
 }

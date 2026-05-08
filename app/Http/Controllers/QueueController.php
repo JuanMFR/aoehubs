@@ -19,15 +19,18 @@ class QueueController extends Controller
         if ($user->isInCooldown()) {
             $remaining = CooldownService::formatSeconds(CooldownService::remainingSeconds($user));
             return redirect()->route('dashboard')->with('error',
-                "Estás en cooldown anti-griefing por {$remaining}. " .
-                "Causa: abandonaste partidas o aborteaste lobbies recientemente.");
+                "No vas a poder buscar partida por {$remaining}.");
         }
 
         $match = $this->matchmaking->joinQueue($user);
 
+        // Si emparejo instantaneamente (ej. con el Bot Dev), redirigimos
+        // igualmente al dashboard con un session flag — el dashboard JS
+        // dispara el modal "Partida encontrada" + sonido y maneja el
+        // redirect tras countdown. Asi el flow es uniforme con el caso PvP
+        // donde el match aparece via polling.
         if ($match !== null) {
-            return redirect()->route('drafts.maps.show', $match->id)
-                ->with('flash', "Match encontrada: #{$match->id}. Empezá el draft de mapas.");
+            return redirect()->route('dashboard')->with('match_just_made', true);
         }
 
         return redirect()->route('dashboard')->with('flash', 'En cola, esperando rival...');
@@ -49,7 +52,8 @@ class QueueController extends Controller
         $user = $request->user();
         $inQueue = QueueEntry::where('user_id', $user->id)->where('is_bot', false)->exists();
 
-        $activeMatch = GameMatch::where(function ($q) use ($user) {
+        $activeMatch = GameMatch::with(['host', 'opponent'])
+            ->where(function ($q) use ($user) {
                 $q->where('host_user_id', $user->id)
                   ->orWhere('opponent_user_id', $user->id);
             })
@@ -62,15 +66,27 @@ class QueueController extends Controller
             ->first();
 
         // URL de redirect según el estado: si está en draft → a la página del
-        // draft; si ya pasó a pending/in_progress → al detalle del match
-        // (donde está toda la info del lobby + civ + mapa para que el user
-        // sepa qué configurar en AoE2).
+        // draft; si ya pasó a pending/in_progress → al detalle del match.
         $redirectUrl = null;
+        $rival = null;
         if ($activeMatch !== null) {
             $redirectUrl = match ($activeMatch->status) {
                 GameMatch::STATUS_DRAFTING => route('drafts.maps.show', $activeMatch->id),
                 default                    => route('matches.show', $activeMatch->id),
             };
+
+            // Info minima del rival para mostrar en el modal "partida encontrada".
+            $rivalUser = $activeMatch->host_user_id === $user->id
+                ? $activeMatch->opponent
+                : $activeMatch->host;
+            if ($rivalUser) {
+                $rival = [
+                    'name'       => $rivalUser->displayName(),
+                    'rating'     => round($rivalUser->rating),
+                    'avatar_url' => $rivalUser->avatar_url,
+                    'is_bot'     => $rivalUser->isBot(),
+                ];
+            }
         }
 
         return response()->json([
@@ -78,6 +94,7 @@ class QueueController extends Controller
             'match_id'     => $activeMatch?->id,
             'match_status' => $activeMatch?->status,
             'redirect_url' => $redirectUrl,
+            'rival'        => $rival,
         ]);
     }
 }

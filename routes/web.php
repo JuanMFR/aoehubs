@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CivDraftController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\MapDraftController;
 use App\Http\Controllers\MatchController;
@@ -19,6 +20,9 @@ Route::get('/login', [AuthController::class, 'redirectToSteam'])->name('login');
 Route::get('/auth/steam/callback', [AuthController::class, 'handleSteamCallback'])->name('auth.steam.callback');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// Pagina publica del companion — info, requisitos, link de descarga.
+Route::view('/companion', 'companion')->name('companion');
+
 // Leaderboard + perfiles públicos (no requieren login)
 Route::get('/leaderboard',          [LeaderboardController::class, 'index'])->name('leaderboard');
 Route::get('/users/{steamId}',      [UserProfileController::class, 'show'])->name('users.show')
@@ -26,9 +30,7 @@ Route::get('/users/{steamId}',      [UserProfileController::class, 'show'])->nam
 
 // Rutas que requieren login
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/companion/token', [AuthController::class, 'generateCompanionToken'])
         ->name('companion.token');
 
@@ -63,4 +65,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/matches/{match}',      [AdminController::class, 'matchDetail'])->name('matches.show');
     Route::post('/matches/{match}/cancel',    [AdminController::class, 'forceCancel'])->name('matches.cancel');
     Route::post('/matches/{match}/reprocess', [AdminController::class, 'reprocess'])->name('matches.reprocess');
+
+    Route::get('/seasons',                       [AdminController::class, 'seasons'])->name('seasons');
+    Route::post('/seasons/{season}/ends-at',     [AdminController::class, 'updateSeasonEndsAt'])->name('seasons.ends-at');
+    Route::post('/seasons/{season}/close',       [AdminController::class, 'closeSeason'])->name('seasons.close');
 });

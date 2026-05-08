@@ -1,13 +1,24 @@
 @extends('layouts.app')
 
-@section('title', 'Map Draft #' . $match->id . ' — AoE2 Rank')
+@section('title', 'Map Draft #' . $match->id . ' — AoEHubs')
 
 @section('content')
+@php
+    $rival = auth()->id() === $match->host_user_id ? $match->opponent : $match->host;
+@endphp
 <div class="space-y-6">
     <div>
         <h1 class="text-2xl font-bold">Map Draft <span class="text-zinc-500 font-mono text-lg">#{{ $match->id }}</span></h1>
         <p class="mt-1 text-sm text-zinc-500">Cada jugador banea un mapa por turno. El que queda al final es el de la partida.</p>
     </div>
+
+    @if ($rival)
+        <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-stretch">
+            <x-player-card :user="auth()->user()" variant="self" />
+            <div class="flex sm:flex-col items-center justify-center text-2xl sm:text-3xl font-black text-zinc-700 tracking-widest py-2 sm:py-0">VS</div>
+            <x-player-card :user="$rival" variant="rival" />
+        </div>
+    @endif
 
     <div id="turn-banner" class="turn-banner">Cargando...</div>
 
@@ -31,13 +42,34 @@
             </div>
         </div>
         <div class="mt-3 text-xs">
-            <a href="{{ route('drafts.civs.show', $match->id) }}" class="text-zinc-500 hover:text-steam transition-colors">o ir ahora →</a>
+            <a href="{{ route('drafts.civs.show', $match->id) }}" class="text-zinc-500 hover:text-accent transition-colors">o ir ahora →</a>
         </div>
     </div>
+
+    {{-- Cancel match — anti-griefing penalty aplica --}}
+    <div class="flex justify-end pt-2">
+        <button type="button"
+                onclick="document.getElementById('cancel-match-modal').showModal()"
+                class="text-sm text-zinc-500 hover:text-red-400 transition-colors">
+            Cancelar partida
+        </button>
+    </div>
+
+    <x-confirm-modal id="cancel-match-modal"
+                     title="¿Cancelar la partida?"
+                     :action="route('matches.cancel', $match->id)"
+                     confirmLabel="Sí, abandonar"
+                     cancelLabel="Volver al draft"
+                     :danger="true">
+        <p>Vas a abandonar la partida.</p>
+        <p class="text-accent">El tiempo de tu rival también es valioso.</p>
+        <p class="text-xs text-zinc-500">Si lo hacés repetidamente vas a quedar bloqueado para buscar partida durante un tiempo.</p>
+    </x-confirm-modal>
 </div>
 @endsection
 
 @push('scripts')
+@include('partials.translations-js')
 <script>
     const matchId  = {{ $match->id }};
     const csrf     = document.querySelector('meta[name="csrf-token"]').content;
@@ -53,6 +85,11 @@
             const r = await fetch(stateUrl, { headers: { 'Accept': 'application/json' }});
             if (!r.ok) return;
             const data = await r.json();
+            // Si el match se abandono (rival canceló), redirigir al detalle.
+            if (data.match_status === 'abandoned') {
+                window.location.href = `/matches/${matchId}`;
+                return;
+            }
             currentState = data;
             pool = data.pool;
             render(data);
@@ -78,6 +115,8 @@
     // Para evitar que el polling rompa el estado de hover/focus, construimos
     // los elementos UNA sola vez y solo mutamos clases/handlers en cada update.
     const MY_USER_ID = {{ auth()->id() }};
+    const MY_NAME    = @json(auth()->user()->displayName());
+    const RIVAL_NAME = @json($rival ? $rival->displayName() : 'Rival');
     let mapEls = {};
     let lastBanCount = 0;
 
@@ -87,8 +126,23 @@
         grid.innerHTML = '';
         for (const map of pool) {
             const el = document.createElement('div');
-            el.className = 'map';
-            el.textContent = map;
+            el.className = 'map flex flex-col items-center gap-2';
+
+            const img = document.createElement('img');
+            img.src = `/images/maps/${map.toLowerCase().replace(/ /g, '_')}.png`;
+            img.alt = '';
+            // object-contain porque las miniaturas son rombos isometricos
+            // — object-cover cortaria las puntas. Mas alto que ancho para
+            // dar lugar al rombo extendido.
+            img.className = 'h-24 w-32 object-contain';
+            img.loading = 'lazy';
+            img.onerror = () => img.remove();
+            el.appendChild(img);
+
+            const txt = document.createElement('span');
+            txt.textContent = window.t(map);
+            el.appendChild(txt);
+
             grid.appendChild(el);
             mapEls[map] = el;
         }
@@ -102,7 +156,7 @@
         if (banner.className !== desiredClass) banner.className = desiredClass;
 
         const text = state.is_completed
-            ? `Draft completado. Mapa elegido: ${state.final_map}`
+            ? `Draft completado. Mapa elegido: ${window.t(state.final_map)}`
             : state.your_turn
                 ? 'Tu turno: clickeá un mapa para banearlo.'
                 : 'Turno del rival, esperá...';
@@ -122,7 +176,7 @@
         if (state.is_completed) {
             const ns = document.getElementById('next-step');
             ns.classList.remove('hidden');
-            document.getElementById('final-map').textContent = state.final_map;
+            document.getElementById('final-map').textContent = window.t(state.final_map);
             startRedirectCountdown();
         }
         updateTimer();
@@ -151,10 +205,10 @@
             if (lastBanCount === 0) log.innerHTML = '';
             for (let i = lastBanCount; i < state.bans.length; i++) {
                 const b = state.bans[i];
-                const who = b.user_id === MY_USER_ID ? 'Vos' : 'Rival';
+                const who = b.user_id === MY_USER_ID ? MY_NAME : RIVAL_NAME;
                 const row = document.createElement('div');
                 row.className = 'py-1.5 border-b border-zinc-900 last:border-0 animate-fade-in';
-                row.innerHTML = `${i + 1}. ${who} baneó <span class="text-red-400 line-through font-medium">${b.map}</span>`;
+                row.innerHTML = `${i + 1}. ${who} baneó <span class="text-red-400 line-through font-medium">${window.t(b.map)}</span>`;
                 log.appendChild(row);
             }
         }
