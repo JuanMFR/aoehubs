@@ -9,7 +9,7 @@ Pasos y consideraciones para llevar el proyecto a un server real (linux + domini
 - **DB**: MariaDB 10.6+ o MySQL 8 o Postgres 14+ (migrar desde SQLite — ver más abajo)
 - **Composer 2.x**
 - **Node.js 20+ y npm** (solo para `npm run build` que compila Tailwind/Vite — una vez por release)
-- **Python 3.11+** + `pip install mgz-fast` (fork de aoe2insights — soporta el patch actual de DE; el `mgz` upstream está atrasado y NO funciona)
+- **Python 3.11+** + paquetes en `scripts/requirements.txt` (`mgz-fast` para el parser y `aocref` para el mapping de civ_id → nombre). Instalar con: `pip install -r scripts/requirements.txt`. **Importante**: `aocref` NO viene como dependencia transitiva de `mgz-fast`, hay que instalarlo explícitamente — sin él, el parser corre pero todas las civs salen `null`.
 - **Cron** del sistema (Linux: cron estándar; Windows: Task Scheduler)
 
 ## Setup paso a paso
