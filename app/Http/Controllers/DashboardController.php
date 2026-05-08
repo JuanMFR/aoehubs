@@ -37,6 +37,13 @@ class DashboardController extends Controller
         // y mostramos el mensaje generico.
         $botInQueue = QueueEntry::where('is_bot', true)->exists();
 
+        // El companion ping-ea cada 30s; consideramos vivo si last_used_at
+        // esta dentro de los ultimos 90s (3x el ping interval, da margen).
+        $companionToken = $user->tokens()->where('name', 'companion')->latest()->first();
+        $companionAlive = $companionToken
+            && $companionToken->last_used_at
+            && $companionToken->last_used_at->diffInSeconds(now()) < 90;
+
         // Match activa (drafting, pending o in_progress) — para mostrar el
         // CTA "estás en partida" cuando el user vuelve al dashboard mid-flow.
         $activeMatch = GameMatch::with(['host', 'opponent'])
@@ -78,7 +85,7 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'user', 'season', 'queueEntry', 'inCooldown', 'cooldownLeft', 'cooldownSeconds',
             'activeMatch', 'activeMatchUrl', 'activeMatchRival', 'seasonStats',
-            'botInQueue',
+            'botInQueue', 'companionAlive',
         ));
     }
 

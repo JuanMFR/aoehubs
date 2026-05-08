@@ -105,22 +105,38 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <h2 class="text-lg font-semibold">Buscar partida ranked</h2>
-                            <p class="mt-1 text-sm text-zinc-400">
-                                @if ($botInQueue)
+                            @if (!$companionAlive)
+                                <p class="mt-1 text-sm text-amber-300">
+                                    Tu companion no parece estar corriendo. Abrilo para poder buscar partida.
+                                </p>
+                                <p class="mt-1 text-xs text-zinc-500">
+                                    ¿No lo tenés instalado? <a href="{{ route('companion') }}" class="text-accent hover:underline">Descargalo acá</a>.
+                                </p>
+                            @elseif ($botInQueue)
+                                <p class="mt-1 text-sm text-zinc-400">
                                     Hay un Bot Dev permanentemente en cola — vas a quedar emparejado al instante para testing.
-                                @else
+                                </p>
+                            @else
+                                <p class="mt-1 text-sm text-zinc-400">
                                     Vas a quedar en cola hasta que aparezca otro jugador buscando partida.
-                                @endif
-                            </p>
+                                </p>
+                            @endif
                         </div>
-                        <form method="POST" action="{{ route('queue.join') }}" class="shrink-0" data-loading-form>
-                            @csrf
-                            <button type="submit"
-                                    class="w-full sm:w-auto rounded-lg bg-accent px-6 py-3 font-semibold text-accent-dark hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-wait"
-                                    data-loading-text="Buscando...">
+                        @if ($companionAlive)
+                            <form method="POST" action="{{ route('queue.join') }}" class="shrink-0" data-loading-form>
+                                @csrf
+                                <button type="submit"
+                                        class="w-full sm:w-auto rounded-lg bg-accent px-6 py-3 font-semibold text-accent-dark hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-wait"
+                                        data-loading-text="Buscando...">
+                                    Buscar partida
+                                </button>
+                            </form>
+                        @else
+                            <button type="button" disabled
+                                    class="w-full sm:w-auto rounded-lg bg-zinc-800 px-6 py-3 font-semibold text-zinc-500 cursor-not-allowed">
                                 Buscar partida
                             </button>
-                        </form>
+                        @endif
                     </div>
                 </div>
             @endif
