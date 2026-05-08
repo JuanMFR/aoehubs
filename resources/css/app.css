@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+/* Tokens del design system. Extiende Tailwind con la marca Steam. */
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+    --color-steam: #66c0f4;
+    --color-steam-dark: #1b2838;
+    --color-steam-hover: #5aa8d6;
+}
+
+/* Componentes con state classes manipuladas por JS de los drafts. Los class
+   names matchean exactamente lo que el JS togglea, asi no hay que tocar JS. */
+@layer components {
+    /* ── Tiles de mapa y civ (drafts) ───────────────────────────────────── */
+    .map, .civ {
+        @apply rounded-md border-2 border-transparent bg-zinc-800/80 text-center select-none
+               transition-all duration-150;
+    }
+    .map { @apply p-5 text-base; }
+    .civ { @apply p-3 text-sm; }
+
+    .map.selectable,
+    .civ.selectable { @apply cursor-pointer; }
+
+    .map.selectable:hover,
+    .civ.selectable:hover { @apply bg-zinc-700 border-steam; }
+
+    .map.selected,
+    .civ.selected { background: rgb(27 40 56 / 0.9); @apply border-steam text-steam font-semibold; }
+
+    .map.banned,
+    .civ.banned { @apply bg-red-950/40 text-zinc-600 line-through cursor-not-allowed; }
+
+    .map.disabled,
+    .civ.disabled { @apply opacity-40 cursor-not-allowed; }
+
+    .map.final,
+    .civ.final { @apply bg-emerald-950 border-emerald-400 text-emerald-300 font-semibold; }
+
+    /* ── Banner de turno/fase (drafts) ──────────────────────────────────── */
+    .turn-banner, .banner {
+        @apply rounded-lg border-l-4 border-zinc-600 bg-zinc-900/70 px-6 py-4
+               flex justify-between items-center gap-4 transition-colors;
+    }
+    .turn-banner.your-turn,
+    .banner.action       { @apply border-steam; }
+    .turn-banner.their-turn,
+    .banner.waiting      { @apply border-zinc-600 text-zinc-400; }
+    .turn-banner.completed,
+    .banner.completed    { @apply border-emerald-400 bg-emerald-950/40; }
+
+    .turn-banner .timer,
+    .banner .timer {
+        @apply font-mono text-xl px-3 py-1 rounded bg-zinc-950 min-w-[3.5rem] text-center
+               transition-colors;
+    }
+    .turn-banner .timer.warning,
+    .banner .timer.warning { @apply text-amber-400; }
+    .turn-banner .timer.danger,
+    .banner .timer.danger  { @apply text-red-400; }
+
+    /* ── Botones del confirm (civ draft) ────────────────────────────────── */
+    .btn-confirm {
+        @apply rounded bg-steam px-6 py-2.5 font-semibold text-steam-dark
+               hover:bg-steam-hover transition-colors disabled:bg-zinc-800
+               disabled:text-zinc-500 disabled:cursor-not-allowed;
+    }
+
+    /* ── Status badges (matches/index) ──────────────────────────────────── */
+    .badge {
+        @apply inline-block px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide;
+    }
+    .badge-pending            { @apply bg-amber-950 text-amber-300; }
+    .badge-completed          { @apply bg-emerald-950 text-emerald-300; }
+    .badge-in_progress        { @apply bg-sky-950 text-sky-300; }
+    .badge-pending_validation { @apply bg-zinc-800 text-zinc-300; }
+    .badge-invalid            { @apply bg-orange-950 text-orange-300; }
+    .badge-abandoned          { @apply bg-red-950 text-red-300; }
+    .badge-drafting           { @apply bg-purple-950 text-purple-300; }
+}
+
+/* Animacion de entrada de pagina */
+@layer utilities {
+    .animate-fade-in { animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+}
+
+/* Scrollbars en dark mode */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #18181b; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }

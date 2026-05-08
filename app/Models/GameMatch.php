@@ -1,0 +1,149 @@
+<?php
+
+namespace App\Models;
+
+use App\Services\Glicko2;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+// Lo nombramos GameMatch (no Match) porque "match" es palabra reservada en PHP 8+
+// y trae problemas con expresiones tipo match(...). La tabla se llama 'matches'.
+class GameMatch extends Model
+{
+    protected $table = 'matches';
+
+    protected $fillable = [
+        'host_user_id',
+        'opponent_user_id',
+        'config_json',
+        'lobby_id',
+        'status',
+        'started_at',
+        'host_heartbeat_at',
+        'opponent_heartbeat_at',
+        'winner_user_id',
+        'replay_filename',
+        'replay_size',
+        'replay_path',
+        'replay_uploaded_by',
+        'parsed_metadata',
+        'validation_errors',
+        'parsed_at',
+        'host_rating_before',
+        'host_rating_change',
+        'opponent_rating_before',
+        'opponent_rating_change',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'config_json'            => 'array',
+            'replay_size'            => 'integer',
+            'started_at'             => 'datetime',
+            'host_heartbeat_at'      => 'datetime',
+            'opponent_heartbeat_at'  => 'datetime',
+            'parsed_metadata'        => 'array',
+            'validation_errors'      => 'array',
+            'parsed_at'              => 'datetime',
+            'host_rating_before'     => 'float',
+            'host_rating_change'     => 'float',
+            'opponent_rating_before' => 'float',
+            'opponent_rating_change' => 'float',
+        ];
+    }
+
+    // Estados del ciclo de vida de un match:
+    //   drafting           → map/civ drafts en curso
+    //   pending            → drafts done; el host tiene que armar el lobby
+    //   in_progress        → el companion vio el .aoe2record creado
+    //   pending_validation → replay subido pero el parser no pudo leerlo
+    //                        (típicamente porque mgz está atrasado vs el último
+    //                        patch de DE). Sin rating aplicado. Reintenta el
+    //                        cron `matches:reprocess-pending`.
+    //   completed          → parseado, validado, Glicko-2 aplicado. Final.
+    //   invalid            → parseado pero falló validación (mods, settings
+    //                        cambiados, civs distintas al draft, etc). Sin
+    //                        rating. Final — no se reintenta.
+    //   abandoned          → lobby cerrado sin jugar, timeout/heartbeat, o
+    //                        companion reportó salida al menú. Sin rating.
+    public const STATUS_DRAFTING           = 'drafting';
+    public const STATUS_PENDING            = 'pending';
+    public const STATUS_IN_PROGRESS        = 'in_progress';
+    public const STATUS_PENDING_VALIDATION = 'pending_validation';
+    public const STATUS_COMPLETED          = 'completed';
+    public const STATUS_INVALID            = 'invalid';
+    public const STATUS_ABANDONED          = 'abandoned';
+
+    public function host(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'host_user_id');
+    }
+
+    public function opponent(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'opponent_user_id');
+    }
+
+    public function winner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'winner_user_id');
+    }
+
+    public function mapDraft()
+    {
+        return $this->hasOne(MapDraft::class, 'match_id');
+    }
+
+    public function civDraft()
+    {
+        return $this->hasOne(CivDraft::class, 'match_id');
+    }
+
+    /**
+     * Aplica el resultado a los ratings: corre Glicko-2 entre host y opponent
+     * con `$winnerUserId` como ganador, persiste los ratings nuevos en ambos
+     * users, y guarda el snapshot pre-match + el delta en este match.
+     *
+     * NO setea `status` ni `winner_user_id` — eso lo hace el caller en su
+     * propia $match->update(). Este metodo se concentra exclusivamente en la
+     * parte de Glicko-2 + persistencia de cambios de rating.
+     *
+     * Idempotente solo en el sentido de que dos llamadas seguidas con el
+     * mismo winner generan dos rounds de Glicko-2 (= no idempotente). El
+     * caller tiene que llamarlo una sola vez por match.
+     */
+    public function applyRatingChange(int $winnerUserId): void
+    {
+        $host     = $this->host;
+        $opponent = $this->opponent;
+
+        $hostBefore = $host->rating;
+        $oppBefore  = $opponent->rating;
+
+        $hostWon = $winnerUserId === $host->id;
+        $update  = Glicko2::update(
+            $host->rating,     $host->rating_deviation,     $host->rating_volatility,
+            $opponent->rating, $opponent->rating_deviation, $opponent->rating_volatility,
+            $hostWon,
+        );
+
+        $host->update([
+            'rating'            => $update['host']['rating'],
+            'rating_deviation'  => $update['host']['rd'],
+            'rating_volatility' => $update['host']['volatility'],
+        ]);
+        $opponent->update([
+            'rating'            => $update['opponent']['rating'],
+            'rating_deviation'  => $update['opponent']['rd'],
+            'rating_volatility' => $update['opponent']['volatility'],
+        ]);
+
+        $this->update([
+            'host_rating_before'     => $hostBefore,
+            'host_rating_change'     => $update['host']['rating'] - $hostBefore,
+            'opponent_rating_before' => $oppBefore,
+            'opponent_rating_change' => $update['opponent']['rating'] - $oppBefore,
+        ]);
+    }
+}
