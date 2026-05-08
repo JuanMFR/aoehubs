@@ -280,24 +280,37 @@ class AdminController extends Controller
             $rmsId   = $data['rms_map_id']   ?? null;
             $rmsFile = $data['rms_filename'] ?? null;
 
-            if (! $mapName) {
+            // Caso 1: ni rms_map_id ni map_name. Replay realmente roto.
+            if (! $rmsId && ! $mapName) {
                 return response()->json([
                     'ok'    => false,
-                    'error' => 'No se pudo identificar el mapa. rms_filename=' . ($rmsFile ?? '?')
-                              . ' (probablemente map pack del Workshop sin id estandar).',
+                    'error' => 'No se pudo identificar el mapa (sin rms_map_id ni map_name). '
+                              . 'rms_filename=' . ($rmsFile ?? '?'),
                 ], 422);
             }
 
-            // Slug derivado del nombre para el icon_path sugerido.
-            $slug = strtolower(str_replace(' ', '_', $mapName));
+            // Caso 2: tenemos rms_map_id pero map_name es null. mgz-fast no
+            // tiene este mapa en su tabla DE_MAP_NAMES (mapa nuevo, beta, o
+            // version vieja de mgz). Devolvemos partial — admin completa el
+            // canonical name a mano.
+            $partial = $mapName === null;
+            $suggestedName = $mapName ?? '';
+            $slug = $mapName ? strtolower(str_replace(' ', '_', $mapName)) : '';
 
             return response()->json([
                 'ok'             => true,
-                'map_name'       => $mapName,
+                'partial'        => $partial,
+                'map_name'       => $suggestedName,
                 'rms_map_id'     => $rmsId,
                 'rms_filename'   => $rmsFile,
-                'icon_path'      => "maps/{$slug}.png",
-                'already_exists' => Map::where('name', $mapName)->exists(),
+                'icon_path'      => $slug ? "maps/{$slug}.png" : '',
+                'already_exists' => $mapName ? Map::where('name', $mapName)->exists() : false,
+                'partial_message' => $partial
+                    ? "El parser no conoce el nombre del mapa para rms_map_id={$rmsId}. "
+                      . "Esto pasa con mapas nuevos del juego que mgz-fast todavia no actualizo. "
+                      . "Completá el canonical name a mano (mira en aocref o testealo) — el rms_map_id "
+                      . "ya queda asociado al mapa para futuras validaciones."
+                    : null,
             ]);
         } catch (\Throwable $e) {
             return response()->json([

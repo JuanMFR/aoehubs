@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\GameMatch;
+use App\Models\Map;
 
 /**
  * Compara la metadata parseada de un .aoe2record (output de scripts/parse_replay.py
@@ -82,16 +83,26 @@ class MatchValidator
             }
         }
 
-        // 4) Mapa: comparamos contra `map_name`.
+        // 4) Mapa: comparamos contra `map_name` con fallback a `rms_map_id`.
         $mapDraft = $match->mapDraft;
         if ($mapDraft !== null && ! empty($mapDraft->final_map)) {
             $expectedMap = self::norm($mapDraft->final_map);
             $actualMap   = self::norm($parsed['map_name'] ?? '');
 
+            // Fallback: si mgz no tiene el nombre (mapa nuevo no en DE_MAP_NAMES)
+            // pero si el rms_map_id, lo resolvemos via la tabla Map del admin.
+            if ($actualMap === '' && !empty($parsed['rms_map_id'])) {
+                $mapByRms = Map::where('rms_map_id', $parsed['rms_map_id'])->first();
+                if ($mapByRms) {
+                    $actualMap = self::norm($mapByRms->name);
+                }
+            }
+
             if ($actualMap === '') {
                 $errors[] = "No se pudo identificar el mapa en el replay.";
             } elseif ($actualMap !== $expectedMap) {
-                $errors[] = "Se jugó en {$parsed['map_name']} en lugar de {$mapDraft->final_map} (el mapa elegido en el draft).";
+                $playedName = $parsed['map_name'] ?? ('rms_id=' . ($parsed['rms_map_id'] ?? '?'));
+                $errors[] = "Se jugó en {$playedName} en lugar de {$mapDraft->final_map} (el mapa elegido en el draft).";
             }
         }
 

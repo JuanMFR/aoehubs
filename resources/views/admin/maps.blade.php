@@ -249,6 +249,46 @@
                 ? '<div class="text-xs text-amber-400 mt-2">⚠ Ya existe un mapa con este canonical name. Usá la sección de edición arriba.</div>'
                 : '';
 
+            // Caso "partial": el parser conoce el rms_map_id pero no el nombre
+            // (mapa nuevo no incluido en DE_MAP_NAMES de mgz-fast). El admin
+            // ingresa el canonical a mano y queda asociado al rms_map_id.
+            if (data.partial) {
+                resultEl.innerHTML = `
+                    <div class="rounded-lg border border-amber-700/50 bg-amber-950/20 p-4">
+                        <div class="text-sm text-amber-300 font-medium mb-3">⚠ Parser parcial — mapa no reconocido</div>
+                        <p class="text-xs text-zinc-400 mb-3">${data.partial_message}</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
+                            <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-amber-300">${data.rms_map_id}</span></div>
+                            <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${data.rms_filename ?? '—'}</span></div>
+                        </div>
+                        <form method="POST" action="{{ route('admin.maps.store') }}" class="space-y-3">
+                            @csrf
+                            <input type="hidden" name="rms_map_id" value="${data.rms_map_id}">
+                            <input type="hidden" name="sort_order" value="999">
+                            <input type="hidden" name="is_active" value="1">
+                            <div>
+                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Canonical name (ingresá a mano)</label>
+                                <input type="text" name="name" required maxlength="60"
+                                    placeholder="ej. Dust Storm"
+                                    class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                <p class="mt-1 text-xs text-zinc-500">Es lo que devuelve el parser cuando mgz-fast lo soporte. Buscá en aocref/aoe2techtree el nombre EN.</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path (subí el png a public/images/maps/ después)</label>
+                                <input type="text" name="icon_path" placeholder="maps/dust_storm.png"
+                                    class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
+                            </div>
+                            <button type="submit"
+                                class="rounded bg-accent text-accent-dark px-4 py-2 text-sm font-semibold hover:bg-accent-hover transition-colors">
+                                Crear mapa con estos datos
+                            </button>
+                        </form>
+                    </div>
+                `;
+                return;
+            }
+
+            // Caso normal: parser reconoció todo.
             resultEl.innerHTML = `
                 <div class="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
                     <div class="text-sm text-emerald-300 font-medium mb-3">✓ Metadata extraída</div>
