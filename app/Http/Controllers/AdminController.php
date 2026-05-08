@@ -264,14 +264,23 @@ class AdminController extends Controller
         $absolute = Storage::disk('local')->path($tempPath);
 
         try {
-            $parser = app(\App\Services\ReplayParser::class);
-            $parsed = $parser->parse($absolute);
+            $result = \App\Services\ReplayParser::parse($absolute);
 
-            $mapName  = $parsed['map_name']    ?? null;
-            $rmsId    = $parsed['rms_map_id']  ?? null;
-            $rmsFile  = $parsed['rms_filename'] ?? null;
+            // ParseResult tiene ok/data/error/type. ok=false significa que
+            // mgz fallo (replay corrupta o version desactualizada).
+            if (! $result->ok) {
+                return response()->json([
+                    'ok'    => false,
+                    'error' => 'Parser fallo (' . $result->type . '): ' . $result->error,
+                ], 422);
+            }
 
-            if (!$mapName) {
+            $data    = $result->data ?? [];
+            $mapName = $data['map_name']     ?? null;
+            $rmsId   = $data['rms_map_id']   ?? null;
+            $rmsFile = $data['rms_filename'] ?? null;
+
+            if (! $mapName) {
                 return response()->json([
                     'ok'    => false,
                     'error' => 'No se pudo identificar el mapa. rms_filename=' . ($rmsFile ?? '?')
@@ -279,15 +288,15 @@ class AdminController extends Controller
                 ], 422);
             }
 
-            // Sugerimos un slug derivado del nombre para el icon_path.
+            // Slug derivado del nombre para el icon_path sugerido.
             $slug = strtolower(str_replace(' ', '_', $mapName));
 
             return response()->json([
-                'ok'           => true,
-                'map_name'     => $mapName,
-                'rms_map_id'   => $rmsId,
-                'rms_filename' => $rmsFile,
-                'icon_path'    => "maps/{$slug}.png",
+                'ok'             => true,
+                'map_name'       => $mapName,
+                'rms_map_id'     => $rmsId,
+                'rms_filename'   => $rmsFile,
+                'icon_path'      => "maps/{$slug}.png",
                 'already_exists' => Map::where('name', $mapName)->exists(),
             ]);
         } catch (\Throwable $e) {
