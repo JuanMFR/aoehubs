@@ -1,6 +1,21 @@
 # Release Notes
 
-## [Unreleased](https://github.com/laravel/laravel/compare/v12.12.1...12.x)
+## [Unreleased](https://github.com/laravel/laravel/compare/v0.3.0...main)
+
+## [v0.3.0](https://github.com/laravel/laravel/compare/v12.12.1...v0.3.0) - 2026-05-08
+
+### Cambios principales
+
+- Auto-update vía Velopack — esta versión y todas las siguientes se actualizan solas en background
+- Ventana visual con estados color-coded (reemplaza la consola)
+- Setup form con hyperlinks a aoehubs.com
+- Confirm dialog al cerrar si estás en partida
+- Presence ping cada 30s para que el server sepa que el companion está corriendo
+- Map pool ahora gestionado desde admin (no afecta al companion directamente, pero las próximas adiciones de mapas se reflejan automáticamente)
+
+### Para usuarios existentes (v0.1.0 / v0.2.x)
+
+Hay que desinstalar la versión vieja primero (Configuración → Aplicaciones → AoE2 Companion → Desinstalar). Después bajan este `AoE2Companion-win-Setup.exe`. El token guardado se preserva. **A partir de esta versión las actualizaciones son automáticas.**
 
 ## [v12.12.1](https://github.com/laravel/laravel/compare/v12.12.0...v12.12.1) - 2026-03-10
 
