@@ -78,7 +78,7 @@
                     </div>
                 </div>
                 <span class="text-sm font-semibold shrink-0 {{ $userVoted ? 'text-zinc-300' : 'text-accent' }}">
-                    {{ $userVoted ? 'Editar voto →' : 'Opinar →' }}
+                    {{ $userVoted ? 'Editar voto →' : 'Votar →' }}
                 </span>
             </div>
         </button>

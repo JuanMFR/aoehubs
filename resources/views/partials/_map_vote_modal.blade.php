@@ -61,31 +61,41 @@
                         $isSelected = in_array($map->id, $selected);
                         $voteCount  = (int) ($tallyByMap[$map->id]['votes'] ?? 0);
                         $pct        = $voteTotalBallots > 0 ? round($voteCount / $voteTotalBallots * 100) : 0;
+                        // Tint alpha = pct/100 * 0.30 cap. Asi 0% queda transparente
+                        // y 100% queda con un dorado tenue, sin opacar el contenido.
+                        $tintAlpha = round($pct / 100 * 0.30, 3);
                     @endphp
-                    {{-- has-[:checked]: switch del fondo cuando el checkbox interno esta marcado.
-                         CSS-only, sin JS para el highlight. El JS solo enforce el max de seleccion. --}}
+                    {{-- has-[:checked]: cambia border + intensidad de fondo cuando el
+                         checkbox interno esta marcado. CSS-only para el highlight. --}}
                     <label class="vote-card relative flex flex-col items-center gap-1.5 p-3 rounded-lg border cursor-pointer overflow-hidden
                                   bg-zinc-950 border-zinc-800 transition-colors
                                   hover:bg-zinc-900/80
-                                  has-[:checked]:bg-accent-dark/40 has-[:checked]:border-accent has-[:checked]:hover:bg-accent-dark/50">
+                                  has-[:checked]:border-accent has-[:checked]:bg-accent-dark/30">
+
+                        {{-- Tint de fondo proporcional al % de votos. Capa absoluta
+                             debajo del contenido, color accent (#D4AF37) con alpha
+                             escalada al porcentaje. Mas votos = fondo mas dorado. --}}
+                        @if ($pct > 0)
+                            <span class="absolute inset-0 pointer-events-none"
+                                  style="background-color: rgba(212, 175, 55, {{ $tintAlpha }})"
+                                  aria-hidden="true"></span>
+                        @endif
+
+                        {{-- Checkbox visualmente oculto pero accesible por teclado +
+                             screen readers. Inline style para garantizar que NO se
+                             vea, independiente del build de Tailwind. El click se
+                             propaga via el <label> que lo wrappea. --}}
                         <input type="checkbox" name="votes[]" value="{{ $map->id }}"
-                               class="sr-only vote-check"
+                               class="vote-check"
+                               style="position:absolute;opacity:0;width:0;height:0;margin:0;padding:0;"
                                data-max="{{ $maxVotes }}"
                                {{ $isSelected ? 'checked' : '' }}>
 
-                        {{-- Vote count en la esquina (siempre visible). --}}
-                        <span class="absolute top-1.5 right-2 text-[10px] font-mono text-zinc-500 leading-none"
-                              title="{{ $voteCount }} {{ $voteCount === 1 ? 'voto' : 'votos' }} ({{ $pct }}%)">
-                            {{ $voteCount }}
-                        </span>
-
-                        <x-map-icon :name="$map->name" class="h-14 w-16 sm:h-16 sm:w-20 rounded mt-1" />
-                        <span class="text-xs sm:text-sm text-center font-medium">{{ $map->name_es ?? $map->name }}</span>
-
-                        {{-- Tally bar al fondo (siempre visible, llena % de votos). --}}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900/60">
-                            <div class="h-full bg-accent/70 transition-all"
-                                 style="width: {{ $pct }}%"></div>
+                        <x-map-icon :name="$map->name" class="relative h-14 w-16 sm:h-16 sm:w-20 rounded mt-1" />
+                        <div class="relative text-xs sm:text-sm text-center font-medium leading-tight">
+                            <span>{{ $map->name_es ?? $map->name }}</span>
+                            <span class="text-zinc-600 font-mono ml-1"
+                                  title="{{ $voteCount }} {{ $voteCount === 1 ? 'voto' : 'votos' }} ({{ $pct }}%)">{{ $voteCount }}</span>
                         </div>
                     </label>
                 @endforeach
