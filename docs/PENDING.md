@@ -42,9 +42,10 @@ Cosas que quedaron sin terminar / sin verificar al cierre de la fase de desarrol
 - Decidido al inicio. Cuando haya usuarios reales conviene reconsiderarlo: rateos contra IA inflan/deflanan ratings.
 - **Fix**: en `CompanionApiController::uploadReplay`, si alguno de los participantes es el bot, saltear `applyGlicko2`. Igual para `ExpireStaleMatches` (forfeit no aplica vs bot, ya excluido).
 
-### 7. Sin anti-griefing / cooldowns
-- Si un user abortea muchos lobbies o abandona muchas partidas, no hay penalización. En producción esto se va a abusar.
-- **Fix futuro**: contar aborted/forfeited por user en una ventana móvil (ej. últimas 24h). Si > N, pegarle cooldown progresivo en la queue (5min, 30min, 24h, etc).
+### 7. ✅ RESUELTO — Anti-griefing / cooldowns progresivos
+- `App\Services\CooldownService` con escalado en ventana móvil de 24h: 1ra=warning, 2da=5min, 3ra=30min, 4ta=2h, 5ta+=24h.
+- Tabla `match_offenses` registra `LOBBY_ABORT` y `MID_GAME_DISCONNECT`.
+- `User::isInCooldown()` + chequeo en `QueueController::join` y `Matchmaking::joinQueue`.
 
 ---
 
@@ -131,7 +132,7 @@ Son cosas que single-user en localhost no permite verificar. Lista priorizada:
 - Hoy entrás a la cola y la página queda igual. Conviene un polling con "buscando rival... 0:34" + posición en cola.
 - Backend: `QueueController::status` ya existe — solo falta UX en el dashboard.
 
-### F — Anti-griefing cooldowns
+### F — ✅ RESUELTO — Anti-griefing cooldowns
 - Ver bug #7 más arriba.
 
 ### G — Detección de mods en client
@@ -140,13 +141,9 @@ Son cosas que single-user en localhost no permite verificar. Lista priorizada:
 ### H — ✅ RESUELTO via migración a mgz-fast
 - Ver bug #1.
 
-### I — Refactor: eliminar duplicación de Glicko-2 + persistencia
-- La lógica "computar Glicko-2 + persistir snapshot+delta en match + nuevos ratings en users" está duplicada en 3 lugares:
-  - `CompanionApiController::applyGlicko2()` (privado, llamado desde `uploadReplay`)
-  - `ReprocessPendingMatches::applyGlicko2()` (privado static, idéntico)
-  - `AdminController::applyGlicko2()` (privado, idéntico)
-- **Fix**: extraer a un método del modelo: `GameMatch::resolveWith(int $winnerUserId)` que encapsule la transacción (Glicko-2 service + updates de host/opponent + updates de match). Los 3 callers se reducen a 1 línea.
-- Bajo riesgo, alto valor de mantenibilidad. Ningún cambio de comportamiento.
+### I — ✅ RESUELTO — Refactor: eliminar duplicación de Glicko-2 + persistencia
+- Extraído a `GameMatch::applyRatingChange(int $winnerUserId)` con guard de idempotencia interno (chequea `host_rating_change !== null`).
+- Los 4 callers (`CompanionApiController::uploadReplay`, `ExpireStaleMatches`, `ReprocessPendingMatches`, `AdminController`) lo invocan en 1 línea bajo `lockForUpdate` para protección TOCTOU.
 
 ### J — Sistema admin: features extras útiles para debugging
 - Vista admin tiene overview + users + matches + match-detail. Cosas que faltarían en producción:
@@ -177,6 +174,22 @@ Son cosas que single-user en localhost no permite verificar. Lista priorizada:
   - La config de civ del jugador es selectable solo después de que entra al lobby pero el companion no entra a configurarla
 - **Para debuggear**: rebuildear companion, abrir partida vs bot, mirar el log del companion para ver qué pasos hizo entre el lobby y el inicio de partida. Buscar mensajes de `[Restablecer]`, `LobbyComparator.LogDiffs`, `LobbyCorrector.ApplyAsync`.
 - **Bloqueante para beta**: SÍ. Sin esto, todas las matches van a quedar `invalid` por mismatch de civs/mapa.
+
+### N — Map fingerprint refactor: follow-ups
+Implementado en commit `a742aa8` (validación por `rms_map_id` para vanilla / `rms_filename` para custom, dispatch por flag `is_custom`). Quedan tres follow-ups:
+
+- **N.1 — Calcular `rms_hash` en `parse_replay.py`**: el validator ya tiene la rama lista (`mapMismatchCustom` chequea `hash_equals` si `parsed['rms_hash']` existe). Hace falta extraer el contenido del `.rms` referenciado por el rec y devolver su `sha256`. Solo necesario cuando armemos el primer pack de pro-maps con integridad.
+- **N.2 — Switch UI ES/EN**: los campos `name_es`/`name_en` ya se persisten en `maps`, pero el blade sigue usando `__($map->name)` con `lang/es.json` (legacy). Cambiar el resolver a `$map->name_es ?? __($map->name) ?? $map->name` cuando se agregue toggle de locale al user.
+- **N.3 — `map_drafts.map_id` FK**: hoy `map_drafts.final_map` guarda string. Si admin renombra un mapa, drafts viejos quedan colgando. Refactor: agregar FK `map_id` que apunte a `maps.id`, y derivar `final_map` (string) solo para display. Más invasivo — tocar `MapDraftController`, validator, view drafts. Worth it cuando el pool empiece a tener turnover real.
+
+### O — Map pool voting (community-driven map rotation)
+Inspirado en el sistema de votación de pool de AoE2 ranked oficial. Permitir a la comunidad votar la próxima rotación de mapas desde admin.
+
+Diseño aún por definir — ver discusión abierta. Escenarios principales:
+- Frecuencia: por season, mensual, ad-hoc.
+- Mecánica de voto: top-N por user (multi-select) vs single-vote.
+- Auto-rotación: ¿el cierre de votación reemplaza pool automáticamente o requiere confirmación admin?
+- Coexistencia con eventos pro-pack (item N): la votación tiene que poder pausarse/cancelarse cuando el admin quiera forzar un pool especial.
 
 ### L.1 — PENDIENTE — Allow second upload to override (replay race)
 - **Pendiente**: cuando un user alt+f4 mid-partida, el companion sube un replay incompleto que va a `invalid` (correcto, sin rating change). PERO si el OTRO companion sube su replay completo después, el endpoint lo rechaza con 409 (match ya resuelto).
