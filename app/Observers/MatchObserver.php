@@ -21,8 +21,26 @@ class MatchObserver
 
     public function updated(GameMatch $match): void
     {
-        if (! $match->wasChanged('status')) return;
-        if ($match->status !== GameMatch::STATUS_COMPLETED) return;
+        // Disparamos en dos casos:
+        //  a) status acaba de cambiar a 'completed' (caso normal: replay
+        //     uploaded → status=completed pero applyRatingChange viene
+        //     despues, host_rating_change todavia es null aqui)
+        //  b) host_rating_change acaba de setearse en un match ya completed
+        //     (caso forfeit: status se setea primero, applyRatingChange
+        //     despues, awards necesitan host_rating_before/change para
+        //     evaluar comeback / climber)
+        //
+        // Awards son idempotentes (AwardService::grant tiene check de
+        // duplicado), asi que disparar 2 veces no duplica grants — solo
+        // re-evalua. La fix es necesaria porque sin (b), comeback nunca
+        // se otorga en forfeits (sus inputs vienen del rating before/change).
+        $statusJustCompleted = $match->wasChanged('status')
+            && $match->status === GameMatch::STATUS_COMPLETED;
+        $ratingJustApplied = $match->wasChanged('host_rating_change')
+            && $match->host_rating_change !== null
+            && $match->status === GameMatch::STATUS_COMPLETED;
+
+        if (! $statusJustCompleted && ! $ratingJustApplied) return;
 
         // Cargamos los users frescos para tener el rating post-Glicko.
         $match->loadMissing(['host', 'opponent']);
