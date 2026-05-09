@@ -191,26 +191,46 @@ class AdminController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Fingerprint incompleto: vanilla sin rms_map_id, o custom sin rms_filename.
+        // El validator cae a fallback (comparar por nombre) en estos casos —
+        // mostramos un banner para alentar al admin a completarlos.
+        $incomplete = $maps->filter(fn ($m) =>
+            (! $m->is_custom && $m->rms_map_id === null)
+            || ($m->is_custom && empty($m->rms_filename))
+        );
+
         $iconBaseDir = public_path('images/maps');
-        return view('admin.maps', compact('maps', 'iconBaseDir'));
+        return view('admin.maps', compact('maps', 'iconBaseDir', 'incomplete'));
     }
 
     public function storeMap(Request $request)
     {
-        $data = $request->validate([
-            'name'       => ['required', 'string', 'max:60', 'unique:maps,name'],
-            'icon_path'  => ['nullable', 'string', 'max:255'],
-            'rms_map_id' => ['nullable', 'integer', 'min:0'],
-            'sort_order' => ['nullable', 'integer'],
-            'is_active'  => ['nullable', 'boolean'],
-        ]);
+        $data = $this->validateMapFields($request);
+
+        // Garantia minima: vanilla necesita rms_map_id, custom necesita rms_filename.
+        // Sin esto la validacion de matches no podria identificar el mapa.
+        if (! ($data['is_custom'] ?? false) && empty($data['rms_map_id'])) {
+            return back()->withErrors([
+                'rms_map_id' => 'Mapa vanilla: rms_map_id es obligatorio (subi un replay para auto-detectarlo).',
+            ])->withInput();
+        }
+        if (($data['is_custom'] ?? false) && empty($data['rms_filename'])) {
+            return back()->withErrors([
+                'rms_filename' => 'Mapa custom: rms_filename es obligatorio (es el nombre del archivo .rms).',
+            ])->withInput();
+        }
 
         Map::create([
-            'name'       => $data['name'],
-            'icon_path'  => $data['icon_path'] ?? null,
-            'rms_map_id' => $data['rms_map_id'] ?? null,
-            'sort_order' => $data['sort_order'] ?? 999,
-            'is_active'  => $data['is_active'] ?? true,
+            'name'         => $data['name'],
+            'name_es'      => $data['name_es']      ?? $data['name'],
+            'name_en'      => $data['name_en']      ?? $data['name'],
+            'icon_path'    => $data['icon_path']    ?? null,
+            'rms_map_id'   => $data['rms_map_id']   ?? null,
+            'rms_filename' => $data['rms_filename'] ?? null,
+            'rms_hash'     => $data['rms_hash']     ?? null,
+            'is_custom'    => $data['is_custom']    ?? false,
+            'sort_order'   => $data['sort_order']   ?? 999,
+            'is_active'    => $data['is_active']    ?? true,
         ]);
 
         return back()->with('flash', "Mapa '{$data['name']}' agregado al pool.");
@@ -218,15 +238,30 @@ class AdminController extends Controller
 
     public function updateMap(Request $request, Map $map)
     {
-        $data = $request->validate([
-            'name'       => ['required', 'string', 'max:60', 'unique:maps,name,' . $map->id],
-            'icon_path'  => ['nullable', 'string', 'max:255'],
-            'rms_map_id' => ['nullable', 'integer', 'min:0'],
-            'sort_order' => ['nullable', 'integer'],
-        ]);
-
+        $data = $this->validateMapFields($request, $map);
         $map->update($data);
         return back()->with('flash', "Mapa '{$map->name}' actualizado.");
+    }
+
+    /**
+     * Validacion compartida entre store y update. Si $map se pasa, la regla
+     * unique:name ignora la fila propia.
+     */
+    private function validateMapFields(Request $request, ?Map $map = null): array
+    {
+        $uniqueName = 'unique:maps,name' . ($map ? ',' . $map->id : '');
+        return $request->validate([
+            'name'         => ['required', 'string', 'max:60', $uniqueName],
+            'name_es'      => ['nullable', 'string', 'max:60'],
+            'name_en'      => ['nullable', 'string', 'max:60'],
+            'icon_path'    => ['nullable', 'string', 'max:255'],
+            'rms_map_id'   => ['nullable', 'integer', 'min:0'],
+            'rms_filename' => ['nullable', 'string', 'max:120'],
+            'rms_hash'     => ['nullable', 'string', 'size:64', 'regex:/^[0-9a-f]+$/i'],
+            'is_custom'    => ['nullable', 'boolean'],
+            'sort_order'   => ['nullable', 'integer'],
+            'is_active'    => ['nullable', 'boolean'],
+        ]);
     }
 
     public function toggleMap(Map $map)
@@ -295,15 +330,25 @@ class AdminController extends Controller
             $suggestedName = $mapName ?? '';
             $slug = $mapName ? strtolower(str_replace(' ', '_', $mapName)) : '';
 
+            // Heuristica para sugerir is_custom: si mgz no conoce el nombre y
+            // el rms_filename no parece vanilla (ej. "LP Arena.rms" en lugar de
+            // "ARABIA.rms"), probablemente es un mapa de un pack/Workshop.
+            // Marcamos `suggest_is_custom=true` para que el admin lo confirme
+            // y la UI muestre los campos correctos. El admin tiene la ultima
+            // palabra — esto solo guia el form.
+            $suggestIsCustom = $partial && $rmsFile !== null
+                && ! preg_match('/^[A-Z_]+\.rms$/', $rmsFile);
+
             return response()->json([
-                'ok'             => true,
-                'partial'        => $partial,
-                'map_name'       => $suggestedName,
-                'rms_map_id'     => $rmsId,
-                'rms_filename'   => $rmsFile,
-                'icon_path'      => $slug ? "maps/{$slug}.png" : '',
-                'already_exists' => $mapName ? Map::where('name', $mapName)->exists() : false,
-                'partial_message' => $partial
+                'ok'                => true,
+                'partial'           => $partial,
+                'map_name'          => $suggestedName,
+                'rms_map_id'        => $rmsId,
+                'rms_filename'      => $rmsFile,
+                'icon_path'         => $slug ? "maps/{$slug}.png" : '',
+                'suggest_is_custom' => $suggestIsCustom,
+                'already_exists'    => $mapName ? Map::where('name', $mapName)->exists() : false,
+                'partial_message'   => $partial
                     ? "El parser no conoce el nombre del mapa para rms_map_id={$rmsId}. "
                       . "Esto pasa con mapas nuevos del juego que mgz-fast todavia no actualizo. "
                       . "Completá el canonical name a mano (mira en aocref o testealo) — el rms_map_id "

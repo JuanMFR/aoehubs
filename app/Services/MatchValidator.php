@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\GameMatch;
 use App\Models\Map;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Compara la metadata parseada de un .aoe2record (output de scripts/parse_replay.py
@@ -83,26 +84,44 @@ class MatchValidator
             }
         }
 
-        // 4) Mapa: comparamos contra `map_name` con fallback a `rms_map_id`.
+        // 4) Mapa: validacion estructural por fingerprint, no por nombre.
+        //
+        // El nombre que devuelve mgz (`map_name`) viene de DE_MAP_NAMES, una
+        // tabla hardcoded dentro de la libreria. Si mgz queda atrasado vs un
+        // patch de DE, los nombres se desfasan y rompen la comparacion contra
+        // el nombre del draft. La fuente confiable es lo que escribe el juego
+        // mismo en el .aoe2record:
+        //
+        //   - Para mapas vanilla (built-in del juego): `rms_map_id`. Es un
+        //     entero de enum hardcoded en DE (Arabia=9, Nomad=33, ...) que
+        //     NO varia entre clientes ni se ensucia con map packs del Workshop.
+        //     Comparamos `parsed.rms_map_id == map.rms_map_id`.
+        //
+        //   - Para mapas custom (un pack distribuido por nosotros): el
+        //     `rms_map_id` suele ser un sentinel compartido (CUSTOM=59), asi
+        //     que comparamos por `rms_filename`. Si la fila tiene `rms_hash`
+        //     guardado, ademas chequeamos integridad del .rms — pero ese
+        //     hash hoy no se calcula (placeholder para pro-maps futuros).
+        //
+        // El `mapDraft.final_map` es el nombre canonical (string `Map.name`)
+        // elegido en el draft. Resolvemos a la fila Map y dispatch por
+        // is_custom.
         $mapDraft = $match->mapDraft;
         if ($mapDraft !== null && ! empty($mapDraft->final_map)) {
-            $expectedMap = self::norm($mapDraft->final_map);
-            $actualMap   = self::norm($parsed['map_name'] ?? '');
+            $expectedMap = Map::where('name', $mapDraft->final_map)->first();
 
-            // Fallback: si mgz no tiene el nombre (mapa nuevo no en DE_MAP_NAMES)
-            // pero si el rms_map_id, lo resolvemos via la tabla Map del admin.
-            if ($actualMap === '' && !empty($parsed['rms_map_id'])) {
-                $mapByRms = Map::where('rms_map_id', $parsed['rms_map_id'])->first();
-                if ($mapByRms) {
-                    $actualMap = self::norm($mapByRms->name);
+            if ($expectedMap === null) {
+                // Defensivo: no deberia pasar (el draft solo permite mapas del
+                // pool activo). Si pasa, marcamos error en lugar de aprobar.
+                $errors[] = "El mapa '{$mapDraft->final_map}' del draft ya no esta en el pool — re-creá el mapa en admin antes de validar.";
+            } else {
+                $mismatch = $expectedMap->is_custom
+                    ? self::mapMismatchCustom($expectedMap, $parsed)
+                    : self::mapMismatchVanilla($expectedMap, $parsed);
+
+                if ($mismatch !== null) {
+                    $errors[] = $mismatch;
                 }
-            }
-
-            if ($actualMap === '') {
-                $errors[] = "No se pudo identificar el mapa en el replay.";
-            } elseif ($actualMap !== $expectedMap) {
-                $playedName = $parsed['map_name'] ?? ('rms_id=' . ($parsed['rms_map_id'] ?? '?'));
-                $errors[] = "Se jugó en {$playedName} en lugar de {$mapDraft->final_map} (el mapa elegido en el draft).";
             }
         }
 
@@ -187,6 +206,83 @@ class MatchValidator
 
         if (($humans[0]['number'] ?? null) === $winnerNum) return $match->host_user_id;
         if (($humans[1]['number'] ?? null) === $winnerNum) return $match->opponent_user_id;
+
+        return null;
+    }
+
+    /**
+     * Validacion vanilla: el fingerprint primario es `rms_map_id`.
+     *
+     * Backwards-compat: si la fila Map todavia no tiene rms_map_id seteado
+     * (legacy — la columna se introdujo despues, y el admin podria no haber
+     * completado todas las filas todavia), caemos al matching por nombre vs
+     * `parsed.map_name` con un log warning. El banner en admin/maps avisa
+     * cuantas filas estan en este estado.
+     *
+     * Devuelve null si OK, o un string con el error si hay mismatch.
+     */
+    private static function mapMismatchVanilla(Map $expected, array $parsed): ?string
+    {
+        // Fallback legacy: sin rms_map_id, comparamos por nombre. mgz puede
+        // estar atrasado — preferimos falso negativo (no validar) sobre falso
+        // positivo (matchear cualquier mapa).
+        if ($expected->rms_map_id === null) {
+            Log::warning("Map '{$expected->name}' sin rms_map_id — usando fallback por nombre. Admin debe subir rec para autopopular.");
+            $actualMap = self::norm($parsed['map_name'] ?? '');
+            if ($actualMap === '') {
+                return "No se pudo identificar el mapa en el replay (sin rms_map_id en admin).";
+            }
+            if ($actualMap !== self::norm($expected->name)) {
+                $playedLabel = $parsed['map_name'] ?? ('rms_id=' . ($parsed['rms_map_id'] ?? '?'));
+                return "Se jugó en {$playedLabel} en lugar de {$expected->name} (el mapa elegido en el draft).";
+            }
+            return null;
+        }
+
+        $actualId = $parsed['rms_map_id'] ?? null;
+        if ($actualId === null) {
+            return "El replay no expone rms_map_id, no se puede identificar el mapa.";
+        }
+
+        if ((int) $actualId !== (int) $expected->rms_map_id) {
+            // Mensaje amigable: si el parsed devolvio map_name (mgz lo conoce),
+            // lo usamos para el error. Si no, mostramos el id crudo.
+            $playedLabel = $parsed['map_name'] ?? ('rms_id=' . $actualId);
+            return "Se jugó en {$playedLabel} en lugar de {$expected->name} (el mapa elegido en el draft).";
+        }
+
+        return null;
+    }
+
+    /**
+     * Validacion custom: comparamos `rms_filename` (estable solo si la
+     * distribucion del pack la controlamos nosotros). Si la fila tiene
+     * `rms_hash`, ademas chequeamos integridad del .rms para detectar
+     * tampering local — pero hoy parse_replay.py no devuelve el hash, asi
+     * que esa rama queda como follow-up.
+     */
+    private static function mapMismatchCustom(Map $expected, array $parsed): ?string
+    {
+        if ($expected->rms_filename === null) {
+            return "El mapa custom '{$expected->name}' no tiene rms_filename configurado en admin — no se puede validar.";
+        }
+
+        $actualFile = $parsed['rms_filename'] ?? null;
+        if (empty($actualFile)) {
+            return "El replay no expone rms_filename, no se puede identificar el mapa custom.";
+        }
+
+        if (self::norm($actualFile) !== self::norm($expected->rms_filename)) {
+            return "Se jugó con {$actualFile} en lugar de {$expected->rms_filename} (el .rms del mapa custom elegido).";
+        }
+
+        // Hash check — solo si la fila tiene hash guardado y el parser nos
+        // devuelve uno (TODO en parse_replay.py). Por ahora no se ejecuta.
+        if (! empty($expected->rms_hash) && ! empty($parsed['rms_hash'])) {
+            if (! hash_equals($expected->rms_hash, $parsed['rms_hash'])) {
+                return "El contenido del .rms no coincide con el oficial — el script fue modificado.";
+            }
+        }
 
         return null;
     }

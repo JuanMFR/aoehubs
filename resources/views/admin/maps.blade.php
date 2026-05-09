@@ -16,6 +16,23 @@
         </p>
     </div>
 
+    @if (isset($incomplete) && $incomplete->count() > 0)
+        <div class="rounded-lg border border-amber-700/50 bg-amber-950/20 p-4">
+            <div class="text-sm font-semibold text-amber-300 mb-1">
+                {{ $incomplete->count() }} {{ $incomplete->count() === 1 ? 'mapa tiene' : 'mapas tienen' }} fingerprint incompleto
+            </div>
+            <p class="text-xs text-zinc-400 mb-2">
+                Estos mapas validan por nombre (legacy). Para una validacion bulletproof contra el rec,
+                completá el fingerprint subiendo un replay del mapa o editando manualmente.
+            </p>
+            <div class="text-xs text-zinc-500 font-mono">
+                @foreach ($incomplete as $m)
+                    <span class="inline-block mr-3">{{ $m->name }} ({{ $m->is_custom ? 'falta rms_filename' : 'falta rms_map_id' }})</span>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <nav class="flex gap-2 text-sm border-b border-zinc-800 pb-3">
         <a href="{{ route('admin.overview') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Overview</a>
         <a href="{{ route('admin.users') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Usuarios</a>
@@ -33,8 +50,9 @@
                     <tr class="text-left text-xs uppercase tracking-wider text-zinc-500">
                         <th class="px-3 py-3 w-12"></th>
                         <th class="px-3 py-3">Mapa</th>
-                        <th class="px-3 py-3">Canonical name</th>
-                        <th class="px-3 py-3">RMS ID</th>
+                        <th class="px-3 py-3">Canonical</th>
+                        <th class="px-3 py-3">Tipo</th>
+                        <th class="px-3 py-3">Fingerprint</th>
                         <th class="px-3 py-3">Sort</th>
                         <th class="px-3 py-3">Estado</th>
                         <th class="px-3 py-3"></th>
@@ -53,7 +71,23 @@
                                 @endif
                             </td>
                             <td class="px-3 py-3 font-mono text-xs">{{ $m->name }}</td>
-                            <td class="px-3 py-3 font-mono text-xs text-zinc-500">{{ $m->rms_map_id ?? '—' }}</td>
+                            <td class="px-3 py-3">
+                                @if ($m->is_custom)
+                                    <span class="text-xs px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60 uppercase tracking-wider">custom</span>
+                                @else
+                                    <span class="text-xs px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 uppercase tracking-wider">vanilla</span>
+                                @endif
+                            </td>
+                            <td class="px-3 py-3 font-mono text-xs text-zinc-500">
+                                @if ($m->is_custom)
+                                    <div title="Para custom validamos por nombre de archivo">{{ $m->rms_filename ?? '—' }}</div>
+                                    @if ($m->rms_hash)
+                                        <div class="text-[10px] text-zinc-600">sha256: {{ substr($m->rms_hash, 0, 12) }}…</div>
+                                    @endif
+                                @else
+                                    <div title="Para vanilla validamos por rms_map_id">id={{ $m->rms_map_id ?? '—' }}</div>
+                                @endif
+                            </td>
                             <td class="px-3 py-3 font-mono text-xs">{{ $m->sort_order }}</td>
                             <td class="px-3 py-3">
                                 @if ($m->is_active)
@@ -81,23 +115,44 @@
                                 </button>
 
                                 {{-- Edit modal --}}
-                                <dialog id="edit-map-{{ $m->id }}" class="rounded-xl bg-zinc-900 border border-zinc-800 backdrop:bg-black/70 max-w-md w-[90%] p-0 text-zinc-100 m-auto text-left">
+                                <dialog id="edit-map-{{ $m->id }}" class="rounded-xl bg-zinc-900 border border-zinc-800 backdrop:bg-black/70 max-w-lg w-[90%] p-0 text-zinc-100 m-auto text-left">
                                     <form method="POST" action="{{ route('admin.maps.update', $m->id) }}" class="p-5">
                                         @csrf
                                         @method('PATCH')
                                         <h3 class="text-lg font-bold mb-4">Editar mapa</h3>
 
-                                        <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Canonical name</label>
+                                        <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Canonical name (parser EN)</label>
                                         <input type="text" name="name" value="{{ $m->name }}" required maxlength="60"
                                                class="w-full mb-3 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+
+                                        <div class="grid grid-cols-2 gap-3 mb-3">
+                                            <div>
+                                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display ES</label>
+                                                <input type="text" name="name_es" value="{{ $m->name_es }}" maxlength="60" placeholder="Selva Negra"
+                                                       class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display EN</label>
+                                                <input type="text" name="name_en" value="{{ $m->name_en }}" maxlength="60" placeholder="Black Forest"
+                                                       class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                            </div>
+                                        </div>
 
                                         <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path</label>
                                         <input type="text" name="icon_path" value="{{ $m->icon_path }}" placeholder="maps/black_forest.png"
                                                class="w-full mb-3 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
 
-                                        <div class="grid grid-cols-2 gap-3 mb-4">
+                                        <label class="flex items-center gap-2 text-sm mb-3 p-2 rounded bg-zinc-950 border border-zinc-800">
+                                            <input type="hidden" name="is_custom" value="0">
+                                            <input type="checkbox" name="is_custom" value="1" {{ $m->is_custom ? 'checked' : '' }}>
+                                            <span>Mapa custom (de un pack distribuido por la plataforma)</span>
+                                        </label>
+
+                                        <div class="grid grid-cols-2 gap-3 mb-3">
                                             <div>
-                                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">RMS Map ID</label>
+                                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
+                                                    RMS Map ID <span class="normal-case text-zinc-600">(vanilla)</span>
+                                                </label>
                                                 <input type="number" name="rms_map_id" value="{{ $m->rms_map_id }}" min="0"
                                                        class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                                             </div>
@@ -107,6 +162,18 @@
                                                        class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                                             </div>
                                         </div>
+
+                                        <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
+                                            RMS filename <span class="normal-case text-zinc-600">(custom — ej. AOEHUBS_PRO_ARABIA.rms)</span>
+                                        </label>
+                                        <input type="text" name="rms_filename" value="{{ $m->rms_filename }}" maxlength="120" placeholder="AOEHUBS_PRO_ARABIA.rms"
+                                               class="w-full mb-3 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
+
+                                        <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
+                                            RMS sha256 hash <span class="normal-case text-zinc-600">(opcional, custom)</span>
+                                        </label>
+                                        <input type="text" name="rms_hash" value="{{ $m->rms_hash }}" maxlength="64" pattern="[0-9a-fA-F]{64}" placeholder="64 chars hex"
+                                               class="w-full mb-4 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-mono focus:border-accent focus:outline-none">
 
                                         <div class="flex justify-end gap-2">
                                             <button type="button" onclick="this.closest('dialog').close()"
@@ -131,7 +198,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-3 py-8 text-center text-sm text-zinc-500">
+                            <td colspan="8" class="px-3 py-8 text-center text-sm text-zinc-500">
                                 Sin mapas. Corré <code class="text-xs px-1 py-0.5 rounded bg-zinc-800 text-accent">php artisan maps:seed</code>.
                             </td>
                         </tr>
@@ -173,18 +240,35 @@
             <form method="POST" action="{{ route('admin.maps.store') }}" class="grid sm:grid-cols-2 gap-3">
                 @csrf
                 <div class="sm:col-span-2">
-                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Canonical name (igual a lo que devuelve el parser)</label>
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Canonical name (parser EN)</label>
                     <input type="text" name="name" required maxlength="60"
                            placeholder="Black Forest"
                            class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path (opcional)</label>
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display ES (opcional)</label>
+                    <input type="text" name="name_es" maxlength="60" placeholder="Selva Negra"
+                           class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display EN (opcional)</label>
+                    <input type="text" name="name_en" maxlength="60" placeholder="Black Forest"
+                           class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path</label>
                     <input type="text" name="icon_path" placeholder="maps/black_forest.png"
                            class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                 </div>
+                <div class="sm:col-span-2">
+                    <label class="flex items-center gap-2 text-sm p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <input type="hidden" name="is_custom" value="0">
+                        <input type="checkbox" name="is_custom" value="1">
+                        <span>Mapa custom (pack distribuido por la plataforma)</span>
+                    </label>
+                </div>
                 <div>
-                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">RMS Map ID (opcional)</label>
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">RMS Map ID <span class="normal-case text-zinc-600">(vanilla)</span></label>
                     <input type="number" name="rms_map_id" min="0"
                            class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                 </div>
@@ -193,7 +277,17 @@
                     <input type="number" name="sort_order" value="999"
                            class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                 </div>
-                <div class="flex items-end">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">RMS filename <span class="normal-case text-zinc-600">(custom)</span></label>
+                    <input type="text" name="rms_filename" maxlength="120" placeholder="AOEHUBS_PRO_ARABIA.rms"
+                           class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">RMS sha256 hash <span class="normal-case text-zinc-600">(opcional, custom)</span></label>
+                    <input type="text" name="rms_hash" maxlength="64" pattern="[0-9a-fA-F]{64}" placeholder="64 chars hex"
+                           class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-mono focus:border-accent focus:outline-none">
+                </div>
+                <div class="sm:col-span-2 flex items-end">
                     <label class="flex items-center gap-2 text-sm text-zinc-300">
                         <input type="checkbox" name="is_active" value="1" checked>
                         <span>Activar inmediatamente</span>
@@ -249,32 +343,54 @@
                 ? '<div class="text-xs text-amber-400 mt-2">⚠ Ya existe un mapa con este canonical name. Usá la sección de edición arriba.</div>'
                 : '';
 
+            // Helper: escape para evitar XSS si rms_filename tuviera caracteres raros.
+            const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+            const isCustomDefault = data.suggest_is_custom ? 'checked' : '';
+
             // Caso "partial": el parser conoce el rms_map_id pero no el nombre
-            // (mapa nuevo no incluido en DE_MAP_NAMES de mgz-fast). El admin
-            // ingresa el canonical a mano y queda asociado al rms_map_id.
+            // (mapa nuevo no incluido en DE_MAP_NAMES de mgz-fast, o mapa
+            // custom de un pack que mgz no conoce). Admin completa nombre +
+            // confirma si es custom o vanilla.
             if (data.partial) {
                 resultEl.innerHTML = `
                     <div class="rounded-lg border border-amber-700/50 bg-amber-950/20 p-4">
-                        <div class="text-sm text-amber-300 font-medium mb-3">⚠ Parser parcial — mapa no reconocido</div>
+                        <div class="text-sm text-amber-300 font-medium mb-3">⚠ Parser parcial — mapa no reconocido por mgz</div>
                         <p class="text-xs text-zinc-400 mb-3">${data.partial_message}</p>
                         <div class="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
-                            <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-amber-300">${data.rms_map_id}</span></div>
-                            <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${data.rms_filename ?? '—'}</span></div>
+                            <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-amber-300">${esc(data.rms_map_id)}</span></div>
+                            <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${esc(data.rms_filename) || '—'}</span></div>
                         </div>
                         <form method="POST" action="{{ route('admin.maps.store') }}" class="space-y-3">
                             @csrf
-                            <input type="hidden" name="rms_map_id" value="${data.rms_map_id}">
+                            <input type="hidden" name="rms_map_id" value="${esc(data.rms_map_id)}">
+                            <input type="hidden" name="rms_filename" value="${esc(data.rms_filename)}">
                             <input type="hidden" name="sort_order" value="999">
                             <input type="hidden" name="is_active" value="1">
                             <div>
                                 <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Canonical name (ingresá a mano)</label>
-                                <input type="text" name="name" required maxlength="60"
-                                    placeholder="ej. Dust Storm"
+                                <input type="text" name="name" required maxlength="60" placeholder="ej. Dust Storm"
                                     class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
-                                <p class="mt-1 text-xs text-zinc-500">Es lo que devuelve el parser cuando mgz-fast lo soporte. Buscá en aocref/aoe2techtree el nombre EN.</p>
                             </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display ES</label>
+                                    <input type="text" name="name_es" maxlength="60" placeholder="Tormenta de Polvo"
+                                        class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display EN</label>
+                                    <input type="text" name="name_en" maxlength="60" placeholder="Dust Storm"
+                                        class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                </div>
+                            </div>
+                            <label class="flex items-center gap-2 text-sm p-2 rounded bg-zinc-950 border border-zinc-800">
+                                <input type="hidden" name="is_custom" value="0">
+                                <input type="checkbox" name="is_custom" value="1" ${isCustomDefault}>
+                                <span>Mapa custom (validar por rms_filename, no por rms_map_id)</span>
+                            </label>
                             <div>
-                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path (subí el png a public/images/maps/ después)</label>
+                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path</label>
                                 <input type="text" name="icon_path" placeholder="maps/dust_storm.png"
                                     class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                             </div>
@@ -288,29 +404,43 @@
                 return;
             }
 
-            // Caso normal: parser reconoció todo.
+            // Caso normal: parser reconoció todo (mapa vanilla conocido por mgz).
             resultEl.innerHTML = `
                 <div class="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
                     <div class="text-sm text-emerald-300 font-medium mb-3">✓ Metadata extraída</div>
                     <div class="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
-                        <div><span class="text-zinc-500">map_name:</span> <span class="text-emerald-300">${data.map_name}</span></div>
-                        <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-emerald-300">${data.rms_map_id ?? '—'}</span></div>
-                        <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${data.rms_filename ?? '—'}</span></div>
-                        <div><span class="text-zinc-500">icon_path sugerido:</span> <span class="text-zinc-400">${data.icon_path}</span></div>
+                        <div><span class="text-zinc-500">map_name:</span> <span class="text-emerald-300">${esc(data.map_name)}</span></div>
+                        <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-emerald-300">${esc(data.rms_map_id) || '—'}</span></div>
+                        <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${esc(data.rms_filename) || '—'}</span></div>
+                        <div><span class="text-zinc-500">icon_path:</span> <span class="text-zinc-400">${esc(data.icon_path)}</span></div>
                     </div>
                     ${exists}
-                    <form method="POST" action="{{ route('admin.maps.store') }}" class="mt-3 flex flex-wrap gap-2">
+                    <form method="POST" action="{{ route('admin.maps.store') }}" class="mt-3 space-y-3">
                         @csrf
-                        <input type="hidden" name="name" value="${data.map_name}">
-                        <input type="hidden" name="rms_map_id" value="${data.rms_map_id ?? ''}">
-                        <input type="hidden" name="icon_path" value="${data.icon_path}">
+                        <input type="hidden" name="name" value="${esc(data.map_name)}">
+                        <input type="hidden" name="rms_map_id" value="${esc(data.rms_map_id) || ''}">
+                        <input type="hidden" name="rms_filename" value="${esc(data.rms_filename)}">
+                        <input type="hidden" name="icon_path" value="${esc(data.icon_path)}">
                         <input type="hidden" name="sort_order" value="999">
                         <input type="hidden" name="is_active" value="1">
+                        <input type="hidden" name="is_custom" value="0">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display ES (opcional)</label>
+                                <input type="text" name="name_es" maxlength="60" placeholder="ej. Selva Negra"
+                                    class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display EN (opcional)</label>
+                                <input type="text" name="name_en" maxlength="60" value="${esc(data.map_name)}"
+                                    class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                            </div>
+                        </div>
                         <button type="submit" ${data.already_exists ? 'disabled' : ''}
                                 class="rounded bg-accent text-accent-dark px-4 py-2 text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60">
                             Crear mapa con estos datos
                         </button>
-                        <span class="text-xs text-zinc-500 self-center">Asegurate de subir el icono a public/images/${data.icon_path} después</span>
+                        <p class="text-xs text-zinc-500">Acordate de subir el icono a <code>public/images/${esc(data.icon_path)}</code>.</p>
                     </form>
                 </div>
             `;

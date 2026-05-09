@@ -9,8 +9,13 @@ class Map extends Model
 {
     protected $fillable = [
         'name',
+        'name_es',
+        'name_en',
         'icon_path',
         'rms_map_id',
+        'rms_filename',
+        'rms_hash',
+        'is_custom',
         'is_active',
         'sort_order',
     ];
@@ -19,6 +24,7 @@ class Map extends Model
     {
         return [
             'is_active'  => 'boolean',
+            'is_custom'  => 'boolean',
             'rms_map_id' => 'integer',
             'sort_order' => 'integer',
         ];
