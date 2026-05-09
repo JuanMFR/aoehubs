@@ -71,9 +71,15 @@ class MapPoolVote extends Model
 
     /**
      * Computa el ranking de candidatos por cantidad de menciones en ballots.
-     * Tiebreaker: alfabetico por Map::name (deterministico, explicable).
+     * Tiebreaker para DISPLAY (deterministico, predecible al recargar):
+     *   1. votos DESC
+     *   2. pool_winner_count ASC (favor rotacion: el que menos veces gano)
+     *   3. nombre ASC (alfabetico, ultimo recurso)
      *
-     * @return \Illuminate\Support\Collection collection of {map, votes}
+     * Para PICKING winners (no display) ver `pickWinners()` que reemplaza
+     * el ultimo nivel por random.
+     *
+     * @return \Illuminate\Support\Collection collection of {map, votes, pool_winner_count}
      */
     public function tally(): \Illuminate\Support\Collection
     {
@@ -88,16 +94,42 @@ class MapPoolVote extends Model
             }
         }
 
-        // Sort: votos desc, despues por nombre asc (tiebreaker)
         $rows = collect($counts)->map(fn ($votes, $mapId) => [
-            'map'   => $candidates[$mapId],
-            'votes' => $votes,
+            'map'               => $candidates[$mapId],
+            'votes'             => $votes,
+            'pool_winner_count' => $candidates[$mapId]->pool_winner_count,
         ]);
 
         return $rows->sortBy([
             ['votes', 'desc'],
+            ['pool_winner_count', 'asc'],
             fn ($a, $b) => strcmp($a['map']->name, $b['map']->name),
         ])->values();
+    }
+
+    /**
+     * Como tally() pero rompe empates exactos (mismos votos Y mismo
+     * pool_winner_count) al RANDOM en lugar de alfabetico. Usado por
+     * applyToPool() para evitar sesgo cuando hay empate perfecto en el
+     * boundary del top-N.
+     *
+     * Implementacion: agrupamos rows por la tupla (votos, pwc), shuffleamos
+     * cada grupo, y reflattenamos preservando el orden de grupos (que viene
+     * sorteado correctamente desde tally()). Asi solo se randomiza dentro
+     * de cada bucket, no el orden general.
+     *
+     * @return int[] map_ids ganadores
+     */
+    public function pickWinners(): array
+    {
+        $shuffled = $this->tally()
+            ->groupBy(fn ($r) => $r['votes'] . '|' . $r['pool_winner_count'])
+            ->map(fn ($group) => $group->shuffle())
+            ->flatten(1);
+
+        return $shuffled->take($this->pool_size_voted)
+                        ->pluck('map.id')
+                        ->all();
     }
 
     /**
@@ -116,7 +148,6 @@ class MapPoolVote extends Model
         }
 
         return DB::transaction(function () {
-            $tally = $this->tally();
             $totalVotes = $this->ballots()->count();
 
             // Sin ballots: no aplicamos cambios al pool. Cerramos la votacion
@@ -131,19 +162,20 @@ class MapPoolVote extends Model
                 return [];
             }
 
-            // Top N por votos. Si N > candidatos, tomamos todos los candidatos.
-            $winnerIds = $tally->take($this->pool_size_voted)
-                               ->pluck('map.id')
-                               ->all();
+            // Top N con tiebreak random (votos DESC, pool_winner_count ASC,
+            // shuffle dentro de cada bucket exacto). Ver pickWinners().
+            $winnerIds = $this->pickWinners();
 
             // Deactivacion masiva, despues activacion selectiva.
             // - Maps fijos: siempre activos.
-            // - Maps ganadores: activos.
+            // - Maps ganadores: activos + bump de pool_winner_count para
+            //   penalizarlos en el tiebreaker de la SIGUIENTE votacion.
             // - Resto: inactivos.
             Map::query()->update(['is_active' => false]);
             Map::where('is_fixed_in_pool', true)->update(['is_active' => true]);
             if (! empty($winnerIds)) {
                 Map::whereIn('id', $winnerIds)->update(['is_active' => true]);
+                Map::whereIn('id', $winnerIds)->increment('pool_winner_count');
             }
 
             $this->update([

@@ -60,6 +60,7 @@
                         <th class="px-3 py-3">Mapa</th>
                         <th class="px-3 py-3">Votos</th>
                         <th class="px-3 py-3">% de ballots</th>
+                        <th class="px-3 py-3" title="cuantas veces gano una votacion previa — tiebreaker">Wins previos</th>
                         <th class="px-3 py-3">¿Entra al pool?</th>
                     </tr>
                 </thead>
@@ -74,6 +75,7 @@
                             <td class="px-3 py-3 font-medium">{{ $row['map']->name }}</td>
                             <td class="px-3 py-3 font-mono">{{ $row['votes'] }}</td>
                             <td class="px-3 py-3 font-mono text-xs text-zinc-500">{{ $pct }}%</td>
+                            <td class="px-3 py-3 font-mono text-xs text-zinc-500">{{ $row['pool_winner_count'] }}</td>
                             <td class="px-3 py-3">
                                 @if ($isWinner)
                                     <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 uppercase tracking-wider">sí</span>

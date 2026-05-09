@@ -17,6 +17,7 @@ class Map extends Model
         'rms_hash',
         'is_custom',
         'is_fixed_in_pool',
+        'pool_winner_count',
         'is_active',
         'sort_order',
     ];
@@ -24,11 +25,12 @@ class Map extends Model
     protected function casts(): array
     {
         return [
-            'is_active'        => 'boolean',
-            'is_custom'        => 'boolean',
-            'is_fixed_in_pool' => 'boolean',
-            'rms_map_id'       => 'integer',
-            'sort_order'       => 'integer',
+            'is_active'         => 'boolean',
+            'is_custom'         => 'boolean',
+            'is_fixed_in_pool'  => 'boolean',
+            'rms_map_id'        => 'integer',
+            'sort_order'        => 'integer',
+            'pool_winner_count' => 'integer',
         ];
     }
 
