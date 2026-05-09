@@ -130,7 +130,13 @@ class Matchmaking
      */
     private function tryPair(User $user): ?GameMatch
     {
+        // lockForUpdate sobre el lookup del rival. Sin esto, dos transactions
+        // concurrentes (3+ users hitting /queue/join al mismo tiempo) podian
+        // leer el mismo $waiting → ambos lo emparejaban → match duplicada.
+        // El lock serializa el acceso: el segundo ve la queue ya consumida
+        // y devuelve null (queda esperando a otro rival).
         $waiting = QueueEntry::where('user_id', '!=', $user->id)
+            ->lockForUpdate()
             ->orderBy('joined_at')
             ->first();
 
@@ -143,7 +149,7 @@ class Matchmaking
             $hostId = $user->id;
             $oppId  = $waiting->user_id;
         } else {
-            $userEntry = QueueEntry::where('user_id', $user->id)->first();
+            $userEntry = QueueEntry::where('user_id', $user->id)->lockForUpdate()->first();
             $hostId    = $waiting->joined_at < $userEntry->joined_at ? $waiting->user_id : $user->id;
             $oppId     = $hostId === $user->id ? $waiting->user_id : $user->id;
         }
