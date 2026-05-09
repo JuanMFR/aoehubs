@@ -94,8 +94,10 @@
                         <x-map-icon :name="$map->name" class="relative h-14 w-16 sm:h-16 sm:w-20 rounded mt-1" />
                         <div class="relative text-xs sm:text-sm text-center font-medium leading-tight">
                             <span>{{ $map->name_es ?? $map->name }}</span>
-                            <span class="text-zinc-600 font-mono ml-1"
-                                  title="{{ $voteCount }} {{ $voteCount === 1 ? 'voto' : 'votos' }} ({{ $pct }}%)">{{ $voteCount }}</span>
+                            @if ($voteTotalBallots > 0)
+                                <span class="text-zinc-400 font-mono ml-1"
+                                      title="{{ $voteCount }} {{ $voteCount === 1 ? 'voto' : 'votos' }}">{{ $pct }}%</span>
+                            @endif
                         </div>
                     </label>
                 @endforeach
