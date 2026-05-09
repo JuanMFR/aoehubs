@@ -53,7 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/queue/leave', [QueueController::class, 'leave'])->name('queue.leave');
     Route::get('/queue/status', [QueueController::class, 'status'])->name('queue.status');
 
-    Route::get('/maps/vote',  [MapVoteController::class, 'show'])->name('maps.vote');
+    // Voto de pool: solo POST. El modal se renderiza inline en el dashboard
+    // (ver _map_vote_modal partial), no hay vista separada.
     Route::post('/maps/vote', [MapVoteController::class, 'submit'])
         ->middleware('throttle:30,1')
         ->name('maps.vote.submit');

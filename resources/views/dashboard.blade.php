@@ -59,10 +59,12 @@
     @endif
 
     {{-- CTA de votacion de pool — solo si hay una abierta. Si el user no
-         voto aun, copy "opina"; si ya voto, copy "podes cambiar el voto". --}}
+         voto aun, copy "opina"; si ya voto, copy "podes cambiar el voto".
+         Al click abre el <dialog> renderizado abajo en _map_vote_modal. --}}
     @if ($openVote)
-        <a href="{{ route('maps.vote') }}"
-           class="block rounded-xl border {{ $userVoted ? 'border-zinc-700' : 'border-accent/50' }} bg-gradient-to-r {{ $userVoted ? 'from-zinc-900/40' : 'from-accent-dark/30' }} to-zinc-900/40 p-4 sm:p-5 hover:from-accent-dark/40 transition-all">
+        @php $userVoted = $userBallot !== null; @endphp
+        <button type="button" onclick="document.getElementById('vote-modal').showModal()"
+                class="w-full text-left block rounded-xl border {{ $userVoted ? 'border-zinc-700' : 'border-accent/50' }} bg-gradient-to-r {{ $userVoted ? 'from-zinc-900/40' : 'from-accent-dark/30' }} to-zinc-900/40 p-4 sm:p-5 hover:from-accent-dark/40 transition-all">
             <div class="flex items-center justify-between gap-3 flex-wrap">
                 <div class="flex items-center gap-3">
                     <div class="text-3xl shrink-0">🗳</div>
@@ -79,7 +81,9 @@
                     {{ $userVoted ? 'Editar voto →' : 'Opinar →' }}
                 </span>
             </div>
-        </a>
+        </button>
+
+        @include('partials._map_vote_modal')
     @endif
 
     {{-- Matchmaking CTA / queue state --}}
@@ -512,6 +516,36 @@
         updateQueueTimer();
         setInterval(updateQueueTimer, 1000);
         setInterval(pollStatus, 2000);
+    @endif
+
+    // ── Modal de votacion de pool: enforce max de selecciones ───────
+    // El highlight visual de las cards lo hace CSS via has-[:checked].
+    // El JS solo se asegura de que el user no marque mas de pool_size_voted
+    // checkboxes y de actualizar el contador "X / N seleccionados".
+    @if ($openVote)
+        const voteChecks  = document.querySelectorAll('.vote-check');
+        const voteCounter = document.getElementById('vote-modal-count');
+        const voteSubmit  = document.getElementById('vote-modal-submit');
+        const voteMax     = {{ $openVote->pool_size_voted }};
+
+        function updateVoteCount() {
+            const n = Array.from(voteChecks).filter(c => c.checked).length;
+            voteCounter.textContent = n;
+            voteSubmit.disabled = n === 0;
+        }
+
+        voteChecks.forEach(c => {
+            c.addEventListener('change', (e) => {
+                const checkedNow = Array.from(voteChecks).filter(x => x.checked).length;
+                if (checkedNow > voteMax) {
+                    e.target.checked = false;
+                    alert('Solo podés elegir hasta ' + voteMax + ' mapas. Desmarcá uno antes de marcar otro.');
+                }
+                updateVoteCount();
+            });
+        });
+
+        updateVoteCount();
     @endif
 </script>
 @endpush

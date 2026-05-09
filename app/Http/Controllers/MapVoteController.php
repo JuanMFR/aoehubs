@@ -7,37 +7,21 @@ use App\Models\MapPoolVoteBallot;
 use Illuminate\Http\Request;
 
 /**
- * Frontend de votacion de pool de mapas para los users.
+ * Endpoint de submit de voto de pool de mapas.
  *
- * Visibilidad: cualquier user logueado (decisión del producto: maximizar
+ * Visibilidad: cualquier user logueado (decision del producto: maximizar
  * participacion, no es decision que afecte rating asi que multi-account no
  * vale la pena perseguir).
+ *
+ * El form se renderiza inline en el dashboard via partial
+ * `_map_vote_modal.blade.php`; este controller solo procesa el submit y
+ * redirige back al dashboard.
  *
  * Una sola votacion abierta a la vez (enforced en AdminController::storeMapVote);
  * si por alguna razon hay varias, agarramos la mas reciente.
  */
 class MapVoteController extends Controller
 {
-    /**
-     * Vista de votacion. Si no hay votacion abierta, mostramos un empty
-     * state con el snapshot del pool actual + la proxima votacion (si la
-     * hay programada al futuro).
-     */
-    public function show(Request $request)
-    {
-        $vote = MapPoolVote::with('candidates')
-            ->where('status', MapPoolVote::STATUS_OPEN)
-            ->latest('id')
-            ->first();
-
-        $ballot = null;
-        if ($vote !== null) {
-            $ballot = $vote->ballots()->where('user_id', $request->user()->id)->first();
-        }
-
-        return view('maps.vote', compact('vote', 'ballot'));
-    }
-
     /**
      * Submit/update del voto. Idempotente: el user puede submitear N veces
      * mientras la votacion este abierta — sobrescribe su ballot anterior
@@ -51,7 +35,7 @@ class MapVoteController extends Controller
             ->first();
 
         if ($vote === null) {
-            return redirect()->route('maps.vote')
+            return redirect()->route('dashboard')
                 ->with('error', 'No hay ninguna votación abierta ahora mismo.');
         }
 
@@ -59,7 +43,7 @@ class MapVoteController extends Controller
         // el rato entre el render del form y el submit (el cron va a
         // cerrarla en el proximo minuto). Bloqueamos ahi.
         if (! $vote->isVotable()) {
-            return redirect()->route('maps.vote')
+            return redirect()->route('dashboard')
                 ->with('error', 'La votación ya cerró — tu voto no se registró.');
         }
 
@@ -84,7 +68,7 @@ class MapVoteController extends Controller
             ['votes_json' => array_values($data['votes'])],
         );
 
-        return redirect()->route('maps.vote')
+        return redirect()->route('dashboard')
             ->with('flash', 'Tu voto fue registrado. Podés cambiarlo cuantas veces quieras hasta el cierre.');
     }
 }

@@ -75,18 +75,35 @@ class DashboardController extends Controller
             ? Cache::remember("season_stats:{$season->id}", 60, fn () => $this->seasonStats($season))
             : null;
 
-        // Votacion de pool de mapas abierta (si la hay). Sirve para mostrar
-        // un CTA "opina" en el dashboard. El flag $userVoted indica si el
-        // user ya emitio ballot (cambia el copy del CTA).
-        $openVote  = MapPoolVote::where('status', MapPoolVote::STATUS_OPEN)->latest('id')->first();
-        $userVoted = $openVote
-            ? $openVote->ballots()->where('user_id', $user->id)->exists()
-            : false;
+        // Votacion de pool de mapas abierta (si la hay). El modal se renderiza
+        // en el dashboard mismo — la pagina /maps/vote se elimino. Cargamos:
+        //   - candidates: para listar opciones en el modal
+        //   - userBallot: para precheckar las cards si el user ya voto
+        //   - voteTally: counts por candidato, mostrados como barra en cada card
+        //   - voteTotalBallots: para porcentajes
+        //
+        // Tally se computa en cada hit de dashboard. Si esto se vuelve hot,
+        // cachearlo 30s o moverlo a un endpoint AJAX que solo se hit cuando
+        // se abre el modal.
+        $openVote = MapPoolVote::with('candidates')
+            ->where('status', MapPoolVote::STATUS_OPEN)
+            ->latest('id')
+            ->first();
+
+        $userBallot       = null;
+        $voteTally        = null;
+        $voteTotalBallots = 0;
+        if ($openVote !== null) {
+            $userBallot       = $openVote->ballots()->where('user_id', $user->id)->first();
+            $voteTally        = $openVote->tally();
+            $voteTotalBallots = $openVote->ballots()->count();
+        }
 
         return view('dashboard', compact(
             'user', 'season', 'queueEntry', 'inCooldown', 'cooldownLeft', 'cooldownSeconds',
             'activeMatch', 'activeMatchUrl', 'activeMatchRival', 'seasonStats',
-            'botInQueue', 'companionAlive', 'openVote', 'userVoted',
+            'botInQueue', 'companionAlive',
+            'openVote', 'userBallot', 'voteTally', 'voteTotalBallots',
         ));
     }
 
