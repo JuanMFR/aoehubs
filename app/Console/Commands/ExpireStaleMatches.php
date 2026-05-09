@@ -125,17 +125,25 @@ class ExpireStaleMatches extends Command
     private function applyForfeit(GameMatch $match, int $winnerId): void
     {
         DB::transaction(function () use ($match, $winnerId) {
-            $match->update([
+            // Lock + re-check: si otro proceso (replay upload concurrente,
+            // admin reprocess) ya completo el match, no aplicamos forfeit.
+            $fresh = GameMatch::where('id', $match->id)->lockForUpdate()->first();
+            if ($fresh === null || $fresh->status !== GameMatch::STATUS_IN_PROGRESS) {
+                return;
+            }
+
+            $fresh->update([
                 'status'         => GameMatch::STATUS_COMPLETED,
                 'winner_user_id' => $winnerId,
             ]);
-            $match->applyRatingChange($winnerId);
+            // applyRatingChange tiene su propio guard de idempotencia.
+            $fresh->loadMissing(['host', 'opponent'])->applyRatingChange($winnerId);
 
             // Anti-griefing: el que perdió por desconexión recibe ofensa
-            $loserId = $winnerId === $match->host_user_id ? $match->opponent_user_id : $match->host_user_id;
+            $loserId = $winnerId === $fresh->host_user_id ? $fresh->opponent_user_id : $fresh->host_user_id;
             $loser   = User::find($loserId);
             if ($loser) {
-                CooldownService::record($loser, $match, CooldownService::KIND_MID_GAME_DISCONNECT);
+                CooldownService::record($loser, $fresh, CooldownService::KIND_MID_GAME_DISCONNECT);
             }
         });
     }

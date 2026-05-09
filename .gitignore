@@ -29,3 +29,4 @@ Thumbs.db
 /database/database.sqlite-journal
 test_*.php
 "@ | Add-Content .gitignore
+public/images/maps/*.exe

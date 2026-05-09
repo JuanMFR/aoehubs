@@ -278,8 +278,24 @@ class CompanionApiController extends Controller
 
         $resolution = self::resolveReplay($match, Storage::disk('local')->path($path));
 
+        // Lock + re-check dentro de la tx. Race posible cuando host y
+        // opponent suben el replay casi simultaneamente (los dos pasaron
+        // el check anterior con status=in_progress, ambos llegan aca).
+        // El primer transaction completa el match → segundo encuentra
+        // status=completed y bail out. applyRatingChange tiene su propio
+        // guard de idempotencia como segunda capa.
         DB::transaction(function () use ($match, $user, $file, $path, $storedName, $resolution) {
-            $match->update(array_merge([
+            $fresh = GameMatch::where('id', $match->id)->lockForUpdate()->first();
+            if ($fresh === null) return;
+
+            // Mismo conjunto de status finales que el check inicial. Si el
+            // match ya quedo resuelto entre el check y aca (cron forfeit
+            // u otro upload), no hacemos nada.
+            if (in_array($fresh->status, [GameMatch::STATUS_COMPLETED, GameMatch::STATUS_ABANDONED], true)) {
+                return;
+            }
+
+            $fresh->update(array_merge([
                 'replay_filename'     => $file->getClientOriginalName() ?: $storedName,
                 'replay_size'         => $file->getSize(),
                 'replay_path'         => $path,
@@ -287,7 +303,7 @@ class CompanionApiController extends Controller
             ], $resolution['updates']));
 
             if ($resolution['ratingApplied']) {
-                $match->applyRatingChange($resolution['winnerUserId']);
+                $fresh->loadMissing(['host', 'opponent'])->applyRatingChange($resolution['winnerUserId']);
             }
         });
 

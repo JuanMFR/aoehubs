@@ -141,10 +141,16 @@ class AdminController extends Controller
 
         $resolution = CompanionApiController::resolveReplay($match, $absolutePath);
 
+        // Lock + re-check: si el match transiciono entre el check inicial y
+        // aca (cron forfeit u otro upload), no pisamos su estado.
         DB::transaction(function () use ($match, $resolution) {
-            $match->update($resolution['updates']);
+            $fresh = GameMatch::where('id', $match->id)->lockForUpdate()->first();
+            if ($fresh === null || $fresh->status !== GameMatch::STATUS_PENDING_VALIDATION) {
+                return;
+            }
+            $fresh->update($resolution['updates']);
             if ($resolution['ratingApplied']) {
-                $match->fresh(['host', 'opponent'])->applyRatingChange($resolution['winnerUserId']);
+                $fresh->loadMissing(['host', 'opponent'])->applyRatingChange($resolution['winnerUserId']);
             }
         });
 

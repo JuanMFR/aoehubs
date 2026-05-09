@@ -134,12 +134,23 @@ class GameMatch extends Model
      * propia $match->update(). Este metodo se concentra exclusivamente en la
      * parte de Glicko-2 + persistencia de cambios de rating.
      *
-     * Idempotente solo en el sentido de que dos llamadas seguidas con el
-     * mismo winner generan dos rounds de Glicko-2 (= no idempotente). El
-     * caller tiene que llamarlo una sola vez por match.
+     * Idempotente: si `host_rating_change` ya esta seteado (signal de que
+     * Glicko ya corrio para esta match), retorna sin hacer nada. Esto cubre
+     * el caso de race entre cron forfeit + replay upload + admin reprocess
+     * que podian aplicar Glicko dos veces y corromper ratings.
+     *
+     * IMPORTANTE: el caller TAMBIEN debe usar lockForUpdate sobre la row
+     * del match dentro de una transaction antes de llamar — sino la
+     * verificacion de host_rating_change tiene una ventana TOCTOU.
      */
     public function applyRatingChange(int $winnerUserId): void
     {
+        // Guard de idempotencia. Si ya aplicamos cambio de rating, no
+        // re-aplicamos (corromperia los ratings de los dos users).
+        if ($this->host_rating_change !== null) {
+            return;
+        }
+
         $host     = $this->host;
         $opponent = $this->opponent;
 
