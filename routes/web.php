@@ -6,6 +6,7 @@ use App\Http\Controllers\CivDraftController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\MapDraftController;
+use App\Http\Controllers\MapVoteController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\QueueController;
 use App\Http\Controllers\UserProfileController;
@@ -51,6 +52,11 @@ Route::middleware('auth')->group(function () {
         ->name('queue.join');
     Route::post('/queue/leave', [QueueController::class, 'leave'])->name('queue.leave');
     Route::get('/queue/status', [QueueController::class, 'status'])->name('queue.status');
+
+    Route::get('/maps/vote',  [MapVoteController::class, 'show'])->name('maps.vote');
+    Route::post('/maps/vote', [MapVoteController::class, 'submit'])
+        ->middleware('throttle:30,1')
+        ->name('maps.vote.submit');
 
     Route::get('/matches/{id}/draft/maps',        [MapDraftController::class, 'show'])->name('drafts.maps.show');
     Route::get('/matches/{id}/draft/maps/state',  [MapDraftController::class, 'state'])->name('drafts.maps.state');

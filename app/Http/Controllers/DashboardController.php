@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GameMatch;
+use App\Models\MapPoolVote;
 use App\Models\QueueEntry;
 use App\Models\Season;
 use App\Models\User;
@@ -74,10 +75,18 @@ class DashboardController extends Controller
             ? Cache::remember("season_stats:{$season->id}", 60, fn () => $this->seasonStats($season))
             : null;
 
+        // Votacion de pool de mapas abierta (si la hay). Sirve para mostrar
+        // un CTA "opina" en el dashboard. El flag $userVoted indica si el
+        // user ya emitio ballot (cambia el copy del CTA).
+        $openVote  = MapPoolVote::where('status', MapPoolVote::STATUS_OPEN)->latest('id')->first();
+        $userVoted = $openVote
+            ? $openVote->ballots()->where('user_id', $user->id)->exists()
+            : false;
+
         return view('dashboard', compact(
             'user', 'season', 'queueEntry', 'inCooldown', 'cooldownLeft', 'cooldownSeconds',
             'activeMatch', 'activeMatchUrl', 'activeMatchRival', 'seasonStats',
-            'botInQueue', 'companionAlive',
+            'botInQueue', 'companionAlive', 'openVote', 'userVoted',
         ));
     }
 

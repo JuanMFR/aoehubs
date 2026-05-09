@@ -58,6 +58,30 @@
         </a>
     @endif
 
+    {{-- CTA de votacion de pool — solo si hay una abierta. Si el user no
+         voto aun, copy "opina"; si ya voto, copy "podes cambiar el voto". --}}
+    @if ($openVote)
+        <a href="{{ route('maps.vote') }}"
+           class="block rounded-xl border {{ $userVoted ? 'border-zinc-700' : 'border-accent/50' }} bg-gradient-to-r {{ $userVoted ? 'from-zinc-900/40' : 'from-accent-dark/30' }} to-zinc-900/40 p-4 sm:p-5 hover:from-accent-dark/40 transition-all">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-3">
+                    <div class="text-3xl shrink-0">🗳</div>
+                    <div>
+                        <div class="font-semibold {{ $userVoted ? 'text-zinc-200' : 'text-accent' }}">
+                            {{ $userVoted ? 'Ya votaste — podés cambiar tu voto' : 'Hay una votación de pool abierta' }}
+                        </div>
+                        <div class="text-xs text-zinc-400 mt-0.5">
+                            {{ $openVote->name }} · cierra {{ $openVote->ends_at->diffForHumans() }}
+                        </div>
+                    </div>
+                </div>
+                <span class="text-sm font-semibold shrink-0 {{ $userVoted ? 'text-zinc-300' : 'text-accent' }}">
+                    {{ $userVoted ? 'Editar voto →' : 'Opinar →' }}
+                </span>
+            </div>
+        </a>
+    @endif
+
     {{-- Matchmaking CTA / queue state --}}
     @if (!$activeMatch)
         <section>
