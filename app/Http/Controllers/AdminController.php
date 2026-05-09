@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Api\CompanionApiController;
 use App\Models\GameMatch;
 use App\Models\Map;
+use App\Models\MapPoolVote;
 use App\Models\QueueEntry;
 use App\Models\Season;
 use App\Models\User;
@@ -221,16 +222,17 @@ class AdminController extends Controller
         }
 
         Map::create([
-            'name'         => $data['name'],
-            'name_es'      => $data['name_es']      ?? $data['name'],
-            'name_en'      => $data['name_en']      ?? $data['name'],
-            'icon_path'    => $data['icon_path']    ?? null,
-            'rms_map_id'   => $data['rms_map_id']   ?? null,
-            'rms_filename' => $data['rms_filename'] ?? null,
-            'rms_hash'     => $data['rms_hash']     ?? null,
-            'is_custom'    => $data['is_custom']    ?? false,
-            'sort_order'   => $data['sort_order']   ?? 999,
-            'is_active'    => $data['is_active']    ?? true,
+            'name'             => $data['name'],
+            'name_es'          => $data['name_es']          ?? $data['name'],
+            'name_en'          => $data['name_en']          ?? $data['name'],
+            'icon_path'        => $data['icon_path']        ?? null,
+            'rms_map_id'       => $data['rms_map_id']       ?? null,
+            'rms_filename'     => $data['rms_filename']     ?? null,
+            'rms_hash'         => $data['rms_hash']         ?? null,
+            'is_custom'        => $data['is_custom']        ?? false,
+            'is_fixed_in_pool' => $data['is_fixed_in_pool'] ?? false,
+            'sort_order'       => $data['sort_order']       ?? 999,
+            'is_active'        => $data['is_active']        ?? true,
         ]);
 
         return back()->with('flash', "Mapa '{$data['name']}' agregado al pool.");
@@ -251,16 +253,17 @@ class AdminController extends Controller
     {
         $uniqueName = 'unique:maps,name' . ($map ? ',' . $map->id : '');
         return $request->validate([
-            'name'         => ['required', 'string', 'max:60', $uniqueName],
-            'name_es'      => ['nullable', 'string', 'max:60'],
-            'name_en'      => ['nullable', 'string', 'max:60'],
-            'icon_path'    => ['nullable', 'string', 'max:255'],
-            'rms_map_id'   => ['nullable', 'integer', 'min:0'],
-            'rms_filename' => ['nullable', 'string', 'max:120'],
-            'rms_hash'     => ['nullable', 'string', 'size:64', 'regex:/^[0-9a-f]+$/i'],
-            'is_custom'    => ['nullable', 'boolean'],
-            'sort_order'   => ['nullable', 'integer'],
-            'is_active'    => ['nullable', 'boolean'],
+            'name'             => ['required', 'string', 'max:60', $uniqueName],
+            'name_es'          => ['nullable', 'string', 'max:60'],
+            'name_en'          => ['nullable', 'string', 'max:60'],
+            'icon_path'        => ['nullable', 'string', 'max:255'],
+            'rms_map_id'       => ['nullable', 'integer', 'min:0'],
+            'rms_filename'     => ['nullable', 'string', 'max:120'],
+            'rms_hash'         => ['nullable', 'string', 'size:64', 'regex:/^[0-9a-f]+$/i'],
+            'is_custom'        => ['nullable', 'boolean'],
+            'is_fixed_in_pool' => ['nullable', 'boolean'],
+            'sort_order'       => ['nullable', 'integer'],
+            'is_active'        => ['nullable', 'boolean'],
         ]);
     }
 
@@ -401,5 +404,149 @@ class AdminController extends Controller
 
         return redirect()->route('admin.seasons')
             ->with('flash', "Season #{$season->id} cerrada. Season #{$next->id} '{$next->name}' activa.");
+    }
+
+    // ─── Map Pool Votes ────────────────────────────────────────────────
+
+    /**
+     * Lista todas las votaciones (open/closed/cancelled) ordenadas por
+     * recencia. La form de "crear nueva" se renderiza en la misma vista.
+     */
+    public function mapVotes()
+    {
+        $votes = MapPoolVote::orderByDesc('id')->get();
+
+        // Para el form de "crear nueva": maps disponibles como candidatos =
+        // todos los no fijos que NO ganaron la votacion anterior. Admin puede
+        // overridear con un toggle si por alguna razon quiere repetir.
+        $excludeIds = MapPoolVote::lastWinnerIds();
+        $availableMaps = Map::where('is_fixed_in_pool', false)
+            ->orderBy('name')
+            ->get();
+
+        $fixedMaps = Map::where('is_fixed_in_pool', true)
+            ->orderBy('name')
+            ->get();
+
+        // Es valido empezar una nueva solo si no hay otra abierta. Mostrar
+        // banner si hay una en curso.
+        $openVote = $votes->firstWhere('status', MapPoolVote::STATUS_OPEN);
+
+        return view('admin.map-votes', compact(
+            'votes', 'availableMaps', 'fixedMaps', 'excludeIds', 'openVote'
+        ));
+    }
+
+    /**
+     * Crea una nueva votacion. Validamos:
+     *   - No hay otra votacion abierta (1 a la vez)
+     *   - Al menos 2 candidatos y pool_size_voted en rango valido
+     *   - Todos los candidate_ids existen y NO son is_fixed_in_pool
+     *   - ends_at > starts_at + min 1h (evitar votaciones fugaces por error)
+     */
+    public function storeMapVote(Request $request)
+    {
+        if (MapPoolVote::where('status', MapPoolVote::STATUS_OPEN)->exists()) {
+            return back()->with('error', 'Ya hay una votacion abierta — cancelala o esperá su cierre antes de crear otra.');
+        }
+
+        $data = $request->validate([
+            'name'            => ['required', 'string', 'max:80'],
+            'starts_at'       => ['required', 'date'],
+            'ends_at'         => ['required', 'date', 'after:starts_at'],
+            'pool_size_voted' => ['required', 'integer', 'min:1', 'max:30'],
+            'candidate_ids'   => ['required', 'array', 'min:2'],
+            'candidate_ids.*' => ['integer', 'exists:maps,id'],
+        ]);
+
+        // Todos los candidatos deben ser non-fixed (los fijos van directo
+        // al pool sin votar). Validacion explicita en lugar de filtrar
+        // silenciosamente — admin tiene que ver el error.
+        $fixedIds = Map::where('is_fixed_in_pool', true)->pluck('id')->all();
+        $invalidFixed = array_intersect($data['candidate_ids'], $fixedIds);
+        if (! empty($invalidFixed)) {
+            return back()->with('error', 'No se pueden votar mapas fijos: ' . implode(', ', $invalidFixed))->withInput();
+        }
+
+        // pool_size_voted no puede superar la cantidad de candidatos (sino
+        // siempre ganan todos y no hay competencia).
+        if ($data['pool_size_voted'] >= count($data['candidate_ids'])) {
+            return back()->withErrors([
+                'pool_size_voted' => 'pool_size_voted debe ser MENOR que la cantidad de candidatos (sino todos ganan).',
+            ])->withInput();
+        }
+
+        $vote = DB::transaction(function () use ($data) {
+            $vote = MapPoolVote::create([
+                'name'            => $data['name'],
+                'starts_at'       => $data['starts_at'],
+                'ends_at'         => $data['ends_at'],
+                'pool_size_voted' => $data['pool_size_voted'],
+                'status'          => MapPoolVote::STATUS_OPEN,
+            ]);
+            $vote->candidates()->attach($data['candidate_ids']);
+            return $vote;
+        });
+
+        return redirect()->route('admin.map-votes.show', $vote->id)
+            ->with('flash', "Votacion '{$vote->name}' creada con " . count($data['candidate_ids']) . " candidatos.");
+    }
+
+    /**
+     * Detalle: muestra candidatos, tally en vivo (recomputa cada hit), y los
+     * ballots agregados. Si la votacion esta closed, mostramos los winners
+     * congelados en winners_json (no recomputamos para que coincida con lo
+     * aplicado al pool, evitando desfase si despues alguien borra ballots).
+     */
+    public function showMapVote(MapPoolVote $vote)
+    {
+        $vote->load(['candidates', 'ballots']);
+
+        if ($vote->status === MapPoolVote::STATUS_CLOSED && ! empty($vote->winners_json)) {
+            // Tally historico (winners ya congelados). Calculamos el detalle
+            // de votos por candidato igual para mostrar el ranking completo
+            // en la tabla de resultados.
+            $tally = $vote->tally();
+        } else {
+            $tally = $vote->tally();
+        }
+
+        $totalBallots = $vote->ballots->count();
+
+        return view('admin.map-vote-show', compact('vote', 'tally', 'totalBallots'));
+    }
+
+    /**
+     * Cancela una votacion abierta. Marca status=cancelled, NO toca el pool.
+     * Util para abortar cuando entra un evento pro-pack o un error obvio.
+     */
+    public function cancelMapVote(MapPoolVote $vote)
+    {
+        if ($vote->status !== MapPoolVote::STATUS_OPEN) {
+            return back()->with('error', "La votacion '{$vote->name}' no esta abierta — no se puede cancelar.");
+        }
+
+        $vote->update(['status' => MapPoolVote::STATUS_CANCELLED]);
+        return back()->with('flash', "Votacion '{$vote->name}' cancelada — el pool actual queda intacto.");
+    }
+
+    /**
+     * Force-apply ahora, sin esperar a ends_at. Util para testing y para
+     * cuando admin quiere cerrar antes de tiempo (ej extendio la pool y la
+     * votacion ya tuvo participacion suficiente).
+     */
+    public function applyMapVote(MapPoolVote $vote)
+    {
+        if ($vote->status !== MapPoolVote::STATUS_OPEN) {
+            return back()->with('error', "La votacion '{$vote->name}' no esta abierta — no se puede aplicar.");
+        }
+
+        $winners = $vote->applyToPool();
+
+        if (empty($winners)) {
+            return back()->with('error', "Votacion cerrada SIN votos — pool sin cambios.");
+        }
+
+        return back()->with('flash', count($winners) . " ganadores aplicados al pool. Pool actual = " . Map::where('is_active', true)->count() . " mapas activos.");
     }
 }

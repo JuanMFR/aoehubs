@@ -39,6 +39,7 @@
         <a href="{{ route('admin.matches') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Matches</a>
         <a href="{{ route('admin.seasons') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Seasons</a>
         <a href="{{ route('admin.maps') }}" class="px-3 py-1.5 rounded bg-zinc-800 text-zinc-100">Maps</a>
+        <a href="{{ route('admin.map-votes') }}" class="px-3 py-1.5 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900">Votaciones</a>
     </nav>
 
     {{-- Lista de mapas --}}
@@ -53,6 +54,7 @@
                         <th class="px-3 py-3">Canonical</th>
                         <th class="px-3 py-3">Tipo</th>
                         <th class="px-3 py-3">Fingerprint</th>
+                        <th class="px-3 py-3">Fijo</th>
                         <th class="px-3 py-3">Sort</th>
                         <th class="px-3 py-3">Estado</th>
                         <th class="px-3 py-3"></th>
@@ -86,6 +88,14 @@
                                     @endif
                                 @else
                                     <div title="Para vanilla validamos por rms_map_id">id={{ $m->rms_map_id ?? '—' }}</div>
+                                @endif
+                            </td>
+                            <td class="px-3 py-3">
+                                @if ($m->is_fixed_in_pool)
+                                    <span class="text-xs px-1.5 py-0.5 rounded bg-accent-dark text-accent border border-accent/40 uppercase tracking-wider"
+                                          title="Siempre activo, nunca candidato a votación">fijo</span>
+                                @else
+                                    <span class="text-xs text-zinc-600">—</span>
                                 @endif
                             </td>
                             <td class="px-3 py-3 font-mono text-xs">{{ $m->sort_order }}</td>
@@ -141,6 +151,12 @@
                                         <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Icon path</label>
                                         <input type="text" name="icon_path" value="{{ $m->icon_path }}" placeholder="maps/black_forest.png"
                                                class="w-full mb-3 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
+
+                                        <label class="flex items-center gap-2 text-sm mb-2 p-2 rounded bg-zinc-950 border border-zinc-800">
+                                            <input type="hidden" name="is_fixed_in_pool" value="0">
+                                            <input type="checkbox" name="is_fixed_in_pool" value="1" {{ $m->is_fixed_in_pool ? 'checked' : '' }}>
+                                            <span>Mapa fijo del pool (siempre activo, nunca a votación)</span>
+                                        </label>
 
                                         <label class="flex items-center gap-2 text-sm mb-3 p-2 rounded bg-zinc-950 border border-zinc-800">
                                             <input type="hidden" name="is_custom" value="0">
@@ -198,7 +214,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-3 py-8 text-center text-sm text-zinc-500">
+                            <td colspan="9" class="px-3 py-8 text-center text-sm text-zinc-500">
                                 Sin mapas. Corré <code class="text-xs px-1 py-0.5 rounded bg-zinc-800 text-accent">php artisan maps:seed</code>.
                             </td>
                         </tr>
@@ -260,7 +276,12 @@
                     <input type="text" name="icon_path" placeholder="maps/black_forest.png"
                            class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm font-mono focus:border-accent focus:outline-none">
                 </div>
-                <div class="sm:col-span-2">
+                <div class="sm:col-span-2 space-y-2">
+                    <label class="flex items-center gap-2 text-sm p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <input type="hidden" name="is_fixed_in_pool" value="0">
+                        <input type="checkbox" name="is_fixed_in_pool" value="1">
+                        <span>Mapa fijo del pool (siempre activo, nunca a votación)</span>
+                    </label>
                     <label class="flex items-center gap-2 text-sm p-2 rounded bg-zinc-950 border border-zinc-800">
                         <input type="hidden" name="is_custom" value="0">
                         <input type="checkbox" name="is_custom" value="1">

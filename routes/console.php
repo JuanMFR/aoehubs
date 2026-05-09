@@ -15,3 +15,10 @@ Schedule::command('matches:expire-stale')
 Schedule::command('matches:reprocess-pending')
     ->hourly()
     ->withoutOverlapping();
+
+// Cierre automatico de votaciones de pool de mapas: aplica ganadores al pool
+// cuando `ends_at` queda en el pasado. Cada minuto, withoutOverlapping para
+// que dos invocaciones no luchen por la misma fila.
+Schedule::command('map-vote:close-expired')
+    ->everyMinute()
+    ->withoutOverlapping();

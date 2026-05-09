@@ -83,4 +83,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/maps/{map}',          [AdminController::class, 'updateMap'])->name('maps.update');
     Route::post('/maps/{map}/toggle',    [AdminController::class, 'toggleMap'])->name('maps.toggle');
     Route::delete('/maps/{map}',         [AdminController::class, 'destroyMap'])->name('maps.destroy');
+
+    // Map pool voting
+    Route::get('/map-votes',                 [AdminController::class, 'mapVotes'])->name('map-votes');
+    Route::post('/map-votes',                [AdminController::class, 'storeMapVote'])->name('map-votes.store');
+    Route::get('/map-votes/{vote}',          [AdminController::class, 'showMapVote'])->name('map-votes.show');
+    Route::post('/map-votes/{vote}/cancel',  [AdminController::class, 'cancelMapVote'])->name('map-votes.cancel');
+    Route::post('/map-votes/{vote}/apply',   [AdminController::class, 'applyMapVote'])->name('map-votes.apply');
 });
