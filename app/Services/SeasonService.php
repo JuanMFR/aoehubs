@@ -212,21 +212,28 @@ class SeasonService
     }
 
     /**
-     * Aplica el soft reset a TODOS los users (excepto el bot dev).
-     * Solo toca rating, rating_deviation y rating_volatility.
+     * Aplica el soft reset a TODOS los users (excepto el bot dev) en un
+     * solo UPDATE atomico. Antes hacia un UPDATE por user en chunks de 200
+     * — con miles de users eso bloquea el admin UI por minutos.
+     *
+     * Formula: rating = base + (rating - base) * factor.
      */
     private function applySoftReset(array $config): void
     {
-        User::where('steam_id', '!=', User::BOT_STEAM_ID)
-            ->chunkById(200, function ($users) use ($config) {
-                foreach ($users as $u) {
-                    $newRating = $this->softResetRating($u->rating, $config);
-                    $u->update([
-                        'rating'            => $newRating,
-                        'rating_deviation'  => $config['rd_reset'],
-                        'rating_volatility' => $config['volatility_reset'],
-                    ]);
-                }
-            });
+        DB::statement(
+            "UPDATE users
+             SET rating            = ? + (rating - ?) * ?,
+                 rating_deviation  = ?,
+                 rating_volatility = ?
+             WHERE steam_id != ?",
+            [
+                $config['base'],
+                $config['base'],
+                $config['factor'],
+                $config['rd_reset'],
+                $config['volatility_reset'],
+                User::BOT_STEAM_ID,
+            ]
+        );
     }
 }

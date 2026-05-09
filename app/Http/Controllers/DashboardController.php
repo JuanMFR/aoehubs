@@ -8,6 +8,7 @@ use App\Models\Season;
 use App\Models\User;
 use App\Services\CooldownService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -38,25 +39,12 @@ class DashboardController extends Controller
         $botInQueue = QueueEntry::where('is_bot', true)->exists();
 
         // El companion ping-ea cada 30s; consideramos vivo si last_used_at
-        // esta dentro de los ultimos 90s (3x el ping interval, da margen).
-        $companionToken = $user->tokens()->where('name', 'companion')->latest()->first();
-        $companionAlive = $companionToken
-            && $companionToken->last_used_at
-            && $companionToken->last_used_at->diffInSeconds(now()) < 90;
+        // esta dentro de los ultimos 90s (3x el ping interval). Helper en User.
+        $companionAlive = $user->companionAlive();
 
         // Match activa (drafting, pending o in_progress) — para mostrar el
         // CTA "estás en partida" cuando el user vuelve al dashboard mid-flow.
-        $activeMatch = GameMatch::with(['host', 'opponent'])
-            ->where(function ($q) use ($user) {
-                $q->where('host_user_id', $user->id)->orWhere('opponent_user_id', $user->id);
-            })
-            ->whereIn('status', [
-                GameMatch::STATUS_DRAFTING,
-                GameMatch::STATUS_PENDING,
-                GameMatch::STATUS_IN_PROGRESS,
-            ])
-            ->orderByDesc('id')
-            ->first();
+        $activeMatch = $user->activeMatch();
 
         $activeMatchUrl = null;
         $activeMatchRival = null;
@@ -79,8 +67,12 @@ class DashboardController extends Controller
             }
         }
 
-        // Stats de season activa (vacios si no hay season).
-        $seasonStats = $season ? $this->seasonStats($season) : null;
+        // Stats de season activa (vacios si no hay season). Cacheamos 60s
+        // porque son los mismos para TODOS los users — 6 aggregates por
+        // hit del dashboard se vuelven 1 hit cache + miss.
+        $seasonStats = $season
+            ? Cache::remember("season_stats:{$season->id}", 60, fn () => $this->seasonStats($season))
+            : null;
 
         return view('dashboard', compact(
             'user', 'season', 'queueEntry', 'inCooldown', 'cooldownLeft', 'cooldownSeconds',

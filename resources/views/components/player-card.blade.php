@@ -21,17 +21,12 @@
     }
     $isAllTime = $resolvedSeason === null;
 
-    // Stats — filtradas por season si corresponde.
-    $matchQuery = GameMatch::where('status', GameMatch::STATUS_COMPLETED)
-        ->where(function ($q) use ($user) {
-            $q->where('host_user_id', $user->id)->orWhere('opponent_user_id', $user->id);
-        });
-    if ($resolvedSeason) $matchQuery->where('season_id', $resolvedSeason->id);
-
-    $totalMatches = (clone $matchQuery)->count();
-    $wins = (clone $matchQuery)->where('winner_user_id', $user->id)->count();
-    $losses = $totalMatches - $wins;
-    $winRate = $totalMatches > 0 ? round($wins / $totalMatches * 100) : 0;
+    // Stats — un solo query (helper centralizado en User::winLossStats).
+    $stats = $user->winLossStats($resolvedSeason);
+    $totalMatches = $stats['played'];
+    $wins         = $stats['wins'];
+    $losses       = $stats['losses'];
+    $winRate      = $stats['win_rate'];
 
     // Awards a mostrar:
     //   - Per-season: awards de esa season (incluye awards globales que sirven siempre)

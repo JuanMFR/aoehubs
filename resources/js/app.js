@@ -1,5 +1,3 @@
-import './bootstrap';
-
 // Loading states para formularios con [data-loading-form]:
 //   - Al hacer submit, deshabilita el boton submit y le cambia el texto al
 //     valor de data-loading-text (si existe).

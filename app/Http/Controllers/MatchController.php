@@ -30,15 +30,7 @@ class MatchController extends Controller
                   ->orWhere('opponent_user_id', $userId);
             });
 
-        if ($statusFilter && in_array($statusFilter, [
-            GameMatch::STATUS_DRAFTING,
-            GameMatch::STATUS_PENDING,
-            GameMatch::STATUS_IN_PROGRESS,
-            GameMatch::STATUS_COMPLETED,
-            GameMatch::STATUS_PENDING_VALIDATION,
-            GameMatch::STATUS_INVALID,
-            GameMatch::STATUS_ABANDONED,
-        ], true)) {
+        if ($statusFilter && in_array($statusFilter, GameMatch::STATUSES, true)) {
             $query->where('status', $statusFilter);
         } else {
             // Por default ocultamos abandoned — no aportan info al historial.
@@ -82,15 +74,7 @@ class MatchController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $statuses = [
-            GameMatch::STATUS_DRAFTING,
-            GameMatch::STATUS_PENDING,
-            GameMatch::STATUS_IN_PROGRESS,
-            GameMatch::STATUS_COMPLETED,
-            GameMatch::STATUS_PENDING_VALIDATION,
-            GameMatch::STATUS_INVALID,
-            GameMatch::STATUS_ABANDONED,
-        ];
+        $statuses = GameMatch::STATUSES;
 
         return view('matches.index', compact('matches', 'statuses', 'statusFilter', 'resultFilter', 'opponentQ'));
     }

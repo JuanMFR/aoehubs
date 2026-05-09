@@ -76,6 +76,17 @@ class GameMatch extends Model
     public const STATUS_INVALID            = 'invalid';
     public const STATUS_ABANDONED          = 'abandoned';
 
+    /** Lista canónica para iterar (filtros admin, validation, etc.). */
+    public const STATUSES = [
+        self::STATUS_DRAFTING,
+        self::STATUS_PENDING,
+        self::STATUS_IN_PROGRESS,
+        self::STATUS_COMPLETED,
+        self::STATUS_PENDING_VALIDATION,
+        self::STATUS_INVALID,
+        self::STATUS_ABANDONED,
+    ];
+
     /**
      * Auto-asigna la season activa al crear un match si no se paso una
      * explicita. Asi no hay que tocar todos los call-sites de Matchmaking.

@@ -22,16 +22,9 @@ class QueueController extends Controller
                 "No vas a poder buscar partida por {$remaining}.");
         }
 
-        // Bloqueamos si el companion no esta corriendo. El companion hace
-        // un presence ping cada 30s (Program.cs), asi que si last_used_at
-        // tiene mas de 90s probablemente esta cerrado. Sin companion, el
-        // matchmaking no tiene sentido — no se pueden detectar las partidas.
-        $token = $user->tokens()->where('name', 'companion')->latest()->first();
-        $companionAlive = $token
-            && $token->last_used_at
-            && $token->last_used_at->diffInSeconds(now()) < 90;
-
-        if (! $companionAlive) {
+        // Bloqueamos si el companion no esta corriendo. Helper centralizado
+        // que chequea last_used_at del token Sanctum (companion pingea cada 30s).
+        if (! $user->companionAlive()) {
             return redirect()->route('dashboard')->with('error',
                 'El companion no parece estar corriendo. Abrilo y volvé a intentar.');
         }

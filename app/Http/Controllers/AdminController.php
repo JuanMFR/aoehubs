@@ -95,15 +95,7 @@ class AdminController extends Controller
             ->paginate(50)
             ->withQueryString();
 
-        $statuses = [
-            GameMatch::STATUS_DRAFTING,
-            GameMatch::STATUS_PENDING,
-            GameMatch::STATUS_IN_PROGRESS,
-            GameMatch::STATUS_COMPLETED,
-            GameMatch::STATUS_PENDING_VALIDATION,
-            GameMatch::STATUS_INVALID,
-            GameMatch::STATUS_ABANDONED,
-        ];
+        $statuses = GameMatch::STATUSES;
 
         return view('admin.matches', compact('matches', 'status', 'statuses'));
     }
