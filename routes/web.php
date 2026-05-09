@@ -15,23 +15,28 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-// Steam OpenID login
-Route::get('/login', [AuthController::class, 'redirectToSteam'])->name('login');
-Route::get('/auth/steam/callback', [AuthController::class, 'handleSteamCallback'])->name('auth.steam.callback');
+// Steam OpenID login — rate-limited para prevenir abuso del callback
+Route::middleware('throttle:auth-web')->group(function () {
+    Route::get('/login', [AuthController::class, 'redirectToSteam'])->name('login');
+    Route::get('/auth/steam/callback', [AuthController::class, 'handleSteamCallback'])->name('auth.steam.callback');
+});
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Pagina publica del companion — info, requisitos, link de descarga.
 Route::view('/companion', 'companion')->name('companion');
 
-// Leaderboard + perfiles públicos (no requieren login)
-Route::get('/leaderboard',          [LeaderboardController::class, 'index'])->name('leaderboard');
-Route::get('/users/{steamId}',      [UserProfileController::class, 'show'])->name('users.show')
-    ->where('steamId', '\d{17}'); // SteamID64 son siempre 17 digitos
+// Leaderboard + perfiles públicos. Throttle ligero para prevenir scraping.
+Route::middleware('throttle:public-read')->group(function () {
+    Route::get('/leaderboard',          [LeaderboardController::class, 'index'])->name('leaderboard');
+    Route::get('/users/{steamId}',      [UserProfileController::class, 'show'])->name('users.show')
+        ->where('steamId', '\d{17}'); // SteamID64 son siempre 17 digitos
+});
 
 // Rutas que requieren login
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/companion/token', [AuthController::class, 'generateCompanionToken'])
+        ->middleware('throttle:5,1')
         ->name('companion.token');
 
     Route::get('/matches',                [MatchController::class, 'index'])->name('matches.index');
@@ -41,7 +46,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/matches/{id}',           [MatchController::class, 'show'])->name('matches.show')->where('id', '\d+');
     Route::post('/matches/{id}/cancel',   [MatchController::class, 'cancel'])->name('matches.cancel');
 
-    Route::post('/queue/join',  [QueueController::class, 'join'])->name('queue.join');
+    Route::post('/queue/join',  [QueueController::class, 'join'])
+        ->middleware('throttle:10,1')
+        ->name('queue.join');
     Route::post('/queue/leave', [QueueController::class, 'leave'])->name('queue.leave');
     Route::get('/queue/status', [QueueController::class, 'status'])->name('queue.status');
 

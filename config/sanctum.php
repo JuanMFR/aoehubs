@@ -50,7 +50,10 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Tokens del companion expiran a los 90 dias. Limita el blast radius
+    // de un token leakeado y fuerza re-vinculacion periodica. El companion
+    // detecta el 401 y muestra "Token invalido — regenera en aoehubs.com".
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 60 * 24 * 90),
 
     /*
     |--------------------------------------------------------------------------

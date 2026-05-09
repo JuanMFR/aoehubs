@@ -295,8 +295,15 @@ class CompanionApiController extends Controller
                 return;
             }
 
+            // Sanitizar replay_filename — viene del cliente y se muestra en
+            // admin views. basename() prevent path traversal y stripeo
+            // bytes < 0x20 + DEL para evitar header injection si en el
+            // futuro se usa como Content-Disposition.
+            $rawName = $file->getClientOriginalName() ?: $storedName;
+            $safeName = preg_replace('/[\x00-\x1f\x7f]/', '', basename($rawName)) ?: $storedName;
+
             $fresh->update(array_merge([
-                'replay_filename'     => $file->getClientOriginalName() ?: $storedName,
+                'replay_filename'     => mb_substr($safeName, 0, 255),
                 'replay_size'         => $file->getSize(),
                 'replay_path'         => $path,
                 'replay_uploaded_by'  => $user->id,

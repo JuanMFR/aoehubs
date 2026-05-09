@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\SteamProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
@@ -39,6 +40,31 @@ class AuthController extends Controller
         // la query string original para preservar 'openid.xxx' como manda el spec.
         $params = $this->parseRawQuery($request->server('QUERY_STRING') ?? '');
 
+        // 1. return_to debe matchear nuestro callback exacto. Previene que un
+        //    atacante reuse un callback firmado para otro endpoint.
+        $expectedReturn = route('auth.steam.callback');
+        if (($params['openid.return_to'] ?? '') !== $expectedReturn) {
+            return redirect('/')->with('error', 'Callback URL inválida.');
+        }
+
+        // 2. claimed_id tiene que estar firmado. Si no, el response no
+        //    autentica al user — solo dice "Steam respondió OK". Sin esto un
+        //    atacante puede mandar claimed_id arbitrario con firma valida sobre
+        //    otros params.
+        $signed = explode(',', $params['openid.signed'] ?? '');
+        if (! in_array('claimed_id', $signed, true)) {
+            return redirect('/')->with('error', 'Respuesta de Steam incompleta.');
+        }
+
+        // 3. Replay protection: response_nonce tiene que ser unico (cache 24h).
+        //    Sin esto un atacante con un callback URL leakeado puede replayearlo
+        //    indefinidamente.
+        $nonce = $params['openid.response_nonce'] ?? '';
+        if ($nonce === '' || ! Cache::add('openid:nonce:'.hash('sha256', $nonce), 1, now()->addDay())) {
+            return redirect('/')->with('error', 'Respuesta de Steam ya usada o inválida.');
+        }
+
+        // 4. Verificacion criptografica final con Steam.
         if (!$this->verifyWithSteam($params)) {
             return redirect('/')->with('error', 'Steam no validó la identidad.');
         }
