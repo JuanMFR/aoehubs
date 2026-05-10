@@ -16,10 +16,11 @@
             <p class="mt-1 text-sm text-zinc-500">
                 @if ($source === 'platform')
                     {{ $matches->count() }} {{ $matches->count() === 1 ? 'partida' : 'partidas' }} de la plataforma en curso.
+                    Auto-refresh cada 15s.
                 @else
-                    Lobbies globales de AoE2 DE (vía Relic API). Default: solo spectables. Cache 10s.
+                    Lobbies <strong>custom</strong> de AoE2 DE (vía Relic API). No incluye ranked auto-matchmade.
+                    Auto-refresh cada 15s.
                 @endif
-                Auto-refresh cada 15s.
             </p>
         </div>
 

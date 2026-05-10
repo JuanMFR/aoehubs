@@ -191,6 +191,28 @@ Sistema de votación replicando el ranked oficial:
 - Tiebreaker: votos DESC, pool_winner_count ASC, random (favorece rotación).
 - Anti-repeat: ganadores de la votación previa quedan disabled como candidatos por defecto.
 
+### Q — Live games global: ranked auto-matchmade no incluido (decisión consciente)
+
+`/live?source=global` lista lobbies de AoE2 DE vía la API pública de Relic
+(`findAdvertisements`). Esa API solo devuelve **lobbies custom** (gente
+armando games manualmente con "Crear partida"). Los **ranked auto-matchmade**
+NO aparecen ahí — viven en otro endpoint (`findObservableAdvertisements`)
+que requiere autenticación con `sessionID` Steam + `appBinaryChecksum` del
+cliente AoE2 DE.
+
+Por qué no implementamos ranked global:
+- Sites como aoe2recs lo logran con cuenta Steam de servicio logged-in 24/7
+  haciendo polling firmado. Eso es:
+    * Costo de mantenimiento alto (re-auth, re-sign, errores intermitentes)
+    * ToS gris — Microsoft puede ban la cuenta de servicio
+    * Frágil — cualquier patch que cambie el flow de auth nos rompe
+- La alternativa de scrapear `getRecentMatchHistory` por player no es
+  real-time (latencia 2-5 min) y solo cubre top-N players.
+
+Decisión: mantener simple. La pestaña "Global" muestra honestly solo
+"Lobbies custom". El subtitle aclara la limitación. Si en el futuro hay
+demanda real, evaluamos los trade-offs nuevamente.
+
 ### P — Map categories ladders
 Sistema de ratings por categoría de mapa. Cada Map puede pertenecer a 0..N categorías; cada categoría implica una leaderboard derivada con Glicko-2 independiente del global. Implementado en commits X1+X2+X3.
 
