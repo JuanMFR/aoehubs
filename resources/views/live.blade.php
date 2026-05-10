@@ -219,16 +219,6 @@
                 @endforeach
             </select>
 
-            {{-- Toggle "se puede ver" (= isobservable=1). Algunos lobbies no
-                 permiten que un externo entre como espectador; con este on
-                 los filtramos. --}}
-            <label class="flex items-center gap-2 px-3 py-1.5 rounded border border-zinc-700 bg-zinc-950 text-sm cursor-pointer"
-                   title="Algunos hosts no permiten spectators externos. Activá esto para esconder esos lobbies y ver solo los que podés observar.">
-                <input type="hidden" name="observable" value="0">
-                <input type="checkbox" name="observable" value="1" {{ $onlyObs ? 'checked' : '' }} onchange="this.form.submit()">
-                <span class="text-zinc-300">Solo los que se pueden ver</span>
-            </label>
-
             <button type="submit"
                     class="rounded bg-accent text-accent-dark px-4 py-1.5 text-sm font-semibold hover:bg-accent-hover transition-colors">
                 Filtrar
@@ -257,8 +247,6 @@
                 <p class="mt-2 text-sm text-zinc-500">
                     @if ($eloMin >= 2000)
                         El filtro <strong>{{ $eloMin }}+ ELO</strong> es exigente — probá bajarlo.
-                    @elseif ($onlyObs)
-                        Probá desactivar "Solo los que se pueden ver" para incluir lobbies cerrados.
                     @else
                         Probá ajustar la búsqueda.
                     @endif

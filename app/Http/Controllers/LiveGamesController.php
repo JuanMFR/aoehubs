@@ -119,8 +119,6 @@ class LiveGamesController extends Controller
      * Filtros aplicables a global (mas limitados que platform — la API
      * no expone categorias ni nuestro pool de mapas):
      *   - q           → LIKE en mapname OR description (lobby name)
-     *   - observable  → '1' (default) muestra solo isobservable=1.
-     *                   '0' o ausente: cualquiera. El user toggle.
      *   - elo_min     → 0/1500/1800/2000/2200. Default 2000. Filtra
      *                   lobbies donde NINGUN jugador (host + matchmembers)
      *                   cumpla rating >= threshold. Si CUALQUIERA llega
@@ -129,9 +127,13 @@ class LiveGamesController extends Controller
      *                   independiente de si esta hosteando o joineando.
      *                   Cualquier valor fuera de presets cae a default.
      *
+     * Implicito: SIEMPRE filtramos `isobservable=1`. Lobbies cerrados
+     * (sin spectators allowed) no son utiles desde la web — no podes
+     * spectear igual. Removimos el toggle.
+     *
      * Pipeline:
      *   1. Fetch ads (cache 10s).
-     *   2. Filter cheap (q + observable, sin stats).
+     *   2. Filter cheap (q + isobservable, sin stats).
      *   3. Resolver stats SOLO para los que sobreviven (no desperdiciar
      *      hits a la API en lobbies que se van a filtrar).
      *   4. Filter por elo_min usando stats.
@@ -139,8 +141,7 @@ class LiveGamesController extends Controller
      */
     private function indexGlobal(Request $request)
     {
-        $q       = trim((string) $request->query('q', ''));
-        $onlyObs = $request->query('observable', '1') !== '0';
+        $q = trim((string) $request->query('q', ''));
 
         $eloMin = (int) $request->query('elo_min', 2000);
         if (! in_array($eloMin, self::ELO_PRESETS, true)) {
@@ -149,10 +150,8 @@ class LiveGamesController extends Controller
 
         $ads = $this->relic->findAdvertisements();
 
-        // (2a) isobservable filter
-        if ($onlyObs) {
-            $ads = array_values(array_filter($ads, fn ($a) => ($a['isobservable'] ?? 0) === 1));
-        }
+        // (2a) isobservable hardcoded — siempre filtramos a spectables.
+        $ads = array_values(array_filter($ads, fn ($a) => ($a['isobservable'] ?? 0) === 1));
 
         // (2b) search filter
         if ($q !== '') {
@@ -204,7 +203,7 @@ class LiveGamesController extends Controller
         $eloPresets = self::ELO_PRESETS;
 
         return view('live', compact(
-            'source', 'ads', 'stats', 'q', 'onlyObs', 'eloMin', 'eloPresets', 'apiOk',
+            'source', 'ads', 'stats', 'q', 'eloMin', 'eloPresets', 'apiOk',
         ));
     }
 }
