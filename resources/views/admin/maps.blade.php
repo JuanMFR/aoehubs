@@ -55,6 +55,7 @@
                         <th class="px-3 py-3">Canonical</th>
                         <th class="px-3 py-3">Tipo</th>
                         <th class="px-3 py-3">Fingerprint</th>
+                        <th class="px-3 py-3">Categorías</th>
                         <th class="px-3 py-3">Fijo</th>
                         <th class="px-3 py-3">Sort</th>
                         <th class="px-3 py-3">Estado</th>
@@ -89,6 +90,17 @@
                                     @endif
                                 @else
                                     <div title="Para vanilla validamos por rms_map_id">id={{ $m->rms_map_id ?? '—' }}</div>
+                                @endif
+                            </td>
+                            <td class="px-3 py-3">
+                                @if ($m->categories->count() > 0)
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach ($m->categories as $cat)
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">{{ $cat->name }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-xs text-zinc-600">—</span>
                                 @endif
                             </td>
                             <td class="px-3 py-3">
@@ -190,7 +202,23 @@
                                             RMS sha256 hash <span class="normal-case text-zinc-600">(opcional, custom)</span>
                                         </label>
                                         <input type="text" name="rms_hash" value="{{ $m->rms_hash }}" maxlength="64" pattern="[0-9a-fA-F]{64}" placeholder="64 chars hex"
-                                               class="w-full mb-4 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-mono focus:border-accent focus:outline-none">
+                                               class="w-full mb-3 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-mono focus:border-accent focus:outline-none">
+
+                                        @if ($allCategories->count() > 0)
+                                            @php $assignedIds = $m->categories->pluck('id')->all(); @endphp
+                                            <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
+                                                Categorías <span class="normal-case text-zinc-600">(ladders por tipo de mapa)</span>
+                                            </label>
+                                            <div class="grid grid-cols-2 gap-1.5 mb-4 p-2 rounded border border-zinc-800 bg-zinc-950">
+                                                @foreach ($allCategories as $cat)
+                                                    <label class="flex items-center gap-2 text-sm">
+                                                        <input type="checkbox" name="category_ids[]" value="{{ $cat->id }}"
+                                                               {{ in_array($cat->id, $assignedIds) ? 'checked' : '' }}>
+                                                        <span>{{ $cat->name }}</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        @endif
 
                                         <div class="flex justify-end gap-2">
                                             <button type="button" onclick="this.closest('dialog').close()"
@@ -215,7 +243,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-3 py-8 text-center text-sm text-zinc-500">
+                            <td colspan="10" class="px-3 py-8 text-center text-sm text-zinc-500">
                                 Sin mapas. Corré <code class="text-xs px-1 py-0.5 rounded bg-zinc-800 text-accent">php artisan maps:seed</code>.
                             </td>
                         </tr>
@@ -309,6 +337,21 @@
                     <input type="text" name="rms_hash" maxlength="64" pattern="[0-9a-fA-F]{64}" placeholder="64 chars hex"
                            class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-mono focus:border-accent focus:outline-none">
                 </div>
+                @if ($allCategories->count() > 0)
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">
+                            Categorías <span class="normal-case text-zinc-600">(opcional — ladders por tipo)</span>
+                        </label>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-2 rounded border border-zinc-800 bg-zinc-950">
+                            @foreach ($allCategories as $cat)
+                                <label class="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" name="category_ids[]" value="{{ $cat->id }}">
+                                    <span>{{ $cat->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
                 <div class="sm:col-span-2 flex items-end">
                     <label class="flex items-center gap-2 text-sm text-zinc-300">
                         <input type="checkbox" name="is_active" value="1" checked>

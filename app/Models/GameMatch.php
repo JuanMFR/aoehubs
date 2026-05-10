@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\Glicko2;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 // Lo nombramos GameMatch (no Match) porque "match" es palabra reservada en PHP 8+
 // y trae problemas con expresiones tipo match(...). La tabla se llama 'matches'.
@@ -164,33 +165,91 @@ class GameMatch extends Model
 
         $host     = $this->host;
         $opponent = $this->opponent;
+        $hostWon  = $winnerUserId === $host->id;
 
-        $hostBefore = $host->rating;
-        $oppBefore  = $opponent->rating;
+        // Atomico: si Glicko global pega pero el de categoria falla, queremos
+        // que TODO revierta para que la proxima invocacion reintente limpio.
+        // Las nested transactions usan SAVEPOINTs si el caller ya tiene una
+        // transaction abierta — no rompe.
+        DB::transaction(function () use ($host, $opponent, $hostWon) {
+            // 1) Glicko-2 global (existente).
+            $hostBefore = $host->rating;
+            $oppBefore  = $opponent->rating;
 
-        $hostWon = $winnerUserId === $host->id;
-        $update  = Glicko2::update(
-            $host->rating,     $host->rating_deviation,     $host->rating_volatility,
-            $opponent->rating, $opponent->rating_deviation, $opponent->rating_volatility,
-            $hostWon,
-        );
+            $update = Glicko2::update(
+                $host->rating,     $host->rating_deviation,     $host->rating_volatility,
+                $opponent->rating, $opponent->rating_deviation, $opponent->rating_volatility,
+                $hostWon,
+            );
 
-        $host->update([
-            'rating'            => $update['host']['rating'],
-            'rating_deviation'  => $update['host']['rd'],
-            'rating_volatility' => $update['host']['volatility'],
-        ]);
-        $opponent->update([
-            'rating'            => $update['opponent']['rating'],
-            'rating_deviation'  => $update['opponent']['rd'],
-            'rating_volatility' => $update['opponent']['volatility'],
-        ]);
+            $host->update([
+                'rating'            => $update['host']['rating'],
+                'rating_deviation'  => $update['host']['rd'],
+                'rating_volatility' => $update['host']['volatility'],
+            ]);
+            $opponent->update([
+                'rating'            => $update['opponent']['rating'],
+                'rating_deviation'  => $update['opponent']['rd'],
+                'rating_volatility' => $update['opponent']['volatility'],
+            ]);
 
-        $this->update([
-            'host_rating_before'     => $hostBefore,
-            'host_rating_change'     => $update['host']['rating'] - $hostBefore,
-            'opponent_rating_before' => $oppBefore,
-            'opponent_rating_change' => $update['opponent']['rating'] - $oppBefore,
-        ]);
+            $this->update([
+                'host_rating_before'     => $hostBefore,
+                'host_rating_change'     => $update['host']['rating'] - $hostBefore,
+                'opponent_rating_before' => $oppBefore,
+                'opponent_rating_change' => $update['opponent']['rating'] - $oppBefore,
+            ]);
+
+            // 2) Glicko-2 per-category (nuevo). Si el mapa pertenece a una o
+            //    mas categorias, se actualiza el rating de cada una con su
+            //    propio RD/volatility — leaderboards independientes, mismo
+            //    `$hostWon` (la verdad del match es la misma en todas).
+            $this->applyCategoryRatingChanges($hostWon);
+        });
+    }
+
+    /**
+     * Resuelve el mapa via mapDraft.final_map → Map → categories y aplica
+     * Glicko-2 al rating en cada categoria para host y opponent. Crea las
+     * filas user_category_ratings on-demand con defaults estandar
+     * (1500/350/0.06) si no existian.
+     *
+     * No-op si:
+     *   - no hay mapDraft (matches pre-draft o sin mapa resuelto)
+     *   - mapDraft.final_map no resuelve a una fila Map (mapa eliminado del
+     *     pool)
+     *   - el Map no pertenece a ninguna categoria
+     */
+    private function applyCategoryRatingChanges(bool $hostWon): void
+    {
+        $mapName = $this->mapDraft?->final_map;
+        if (! $mapName) return;
+
+        $map = Map::where('name', $mapName)->with('categories')->first();
+        if (! $map || $map->categories->isEmpty()) return;
+
+        foreach ($map->categories as $cat) {
+            $hostCat = UserCategoryRating::getOrCreate($this->host_user_id, $cat->id);
+            $oppCat  = UserCategoryRating::getOrCreate($this->opponent_user_id, $cat->id);
+
+            $update = Glicko2::update(
+                $hostCat->rating, $hostCat->rating_deviation, $hostCat->rating_volatility,
+                $oppCat->rating,  $oppCat->rating_deviation,  $oppCat->rating_volatility,
+                $hostWon,
+            );
+
+            $hostCat->update([
+                'rating'            => $update['host']['rating'],
+                'rating_deviation'  => $update['host']['rd'],
+                'rating_volatility' => $update['host']['volatility'],
+                'matches_played'    => $hostCat->matches_played + 1,
+            ]);
+            $oppCat->update([
+                'rating'            => $update['opponent']['rating'],
+                'rating_deviation'  => $update['opponent']['rd'],
+                'rating_volatility' => $update['opponent']['volatility'],
+                'matches_played'    => $oppCat->matches_played + 1,
+            ]);
+        }
     }
 }

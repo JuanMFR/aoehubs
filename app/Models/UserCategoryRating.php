@@ -47,4 +47,23 @@ class UserCategoryRating extends Model
     {
         return $this->belongsTo(MapCategory::class, 'category_id');
     }
+
+    /**
+     * Lazy-init: si no existe la fila para (user, category), la crea con
+     * defaults Glicko-2 estandar y la devuelve hidratada en memoria
+     * (firstOrCreate de Eloquent no carga column defaults, asi que los
+     * pasamos explicitos en el segundo arg para evitar nulls in-memory).
+     */
+    public static function getOrCreate(int $userId, int $categoryId): self
+    {
+        return static::firstOrCreate(
+            ['user_id' => $userId, 'category_id' => $categoryId],
+            [
+                'rating'            => 1500,
+                'rating_deviation' => 350,
+                'rating_volatility' => 0.06,
+                'matches_played'    => 0,
+            ]
+        );
+    }
 }

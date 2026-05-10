@@ -202,7 +202,9 @@ class AdminController extends Controller
         );
 
         $iconBaseDir = public_path('images/maps');
-        return view('admin.maps', compact('maps', 'iconBaseDir', 'incomplete'));
+        $allCategories = MapCategory::active()->ordered()->get();
+        $maps->load('categories');  // eager para mostrar chips en la tabla
+        return view('admin.maps', compact('maps', 'iconBaseDir', 'incomplete', 'allCategories'));
     }
 
     public function storeMap(Request $request)
@@ -222,7 +224,7 @@ class AdminController extends Controller
             ])->withInput();
         }
 
-        Map::create([
+        $map = Map::create([
             'name'             => $data['name'],
             'name_es'          => $data['name_es']          ?? $data['name'],
             'name_en'          => $data['name_en']          ?? $data['name'],
@@ -236,13 +238,20 @@ class AdminController extends Controller
             'is_active'        => $data['is_active']        ?? true,
         ]);
 
+        // Sync de categorias (M2M). Si no se mando ningun checkbox, sync con
+        // array vacio = des-asocia todas las categorias previas.
+        $map->categories()->sync($data['category_ids'] ?? []);
+
         return back()->with('flash', "Mapa '{$data['name']}' agregado al pool.");
     }
 
     public function updateMap(Request $request, Map $map)
     {
         $data = $this->validateMapFields($request, $map);
+        $catIds = $data['category_ids'] ?? [];
+        unset($data['category_ids']);  // no es columna de la tabla, sync aparte
         $map->update($data);
+        $map->categories()->sync($catIds);
         return back()->with('flash', "Mapa '{$map->name}' actualizado.");
     }
 
@@ -265,6 +274,8 @@ class AdminController extends Controller
             'is_fixed_in_pool' => ['nullable', 'boolean'],
             'sort_order'       => ['nullable', 'integer'],
             'is_active'        => ['nullable', 'boolean'],
+            'category_ids'     => ['nullable', 'array'],
+            'category_ids.*'   => ['integer', 'exists:map_categories,id'],
         ]);
     }
 
