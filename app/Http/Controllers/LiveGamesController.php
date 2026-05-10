@@ -122,7 +122,11 @@ class LiveGamesController extends Controller
      *   - observable  → '1' (default) muestra solo isobservable=1.
      *                   '0' o ausente: cualquiera. El user toggle.
      *   - elo_min     → 0/1500/1800/2000/2200. Default 2000. Filtra
-     *                   lobbies donde el host tenga rating < threshold.
+     *                   lobbies donde NINGUN jugador (host + matchmembers)
+     *                   cumpla rating >= threshold. Si CUALQUIERA llega
+     *                   al umbral, el lobby pasa — analogo a aoe2recs.com,
+     *                   que muestra un lobby cuando hay un top player ahi
+     *                   independiente de si esta hosteando o joineando.
      *                   Cualquier valor fuera de presets cae a default.
      *
      * Pipeline:
@@ -169,16 +173,26 @@ class LiveGamesController extends Controller
         }
         $stats = $this->relic->getPersonalStats($profileIds);
 
-        // (4) elo_min filter sobre el rating del host. Lobbies sin stats
-        // resueltos para el host (profile privado, baneado, sin matches en
-        // 1v1) quedan fuera cuando hay threshold > 0 — son indistinguibles
-        // de "rating bajo" desde nuestro lado.
+        // (4) elo_min filter sobre rating de CUALQUIER jugador del lobby
+        // (host + matchmembers). Si alguno cumple el threshold, el lobby
+        // pasa. Modelo aoe2recs: si hay un top player, el lobby es
+        // interesante aunque no este hosteando. Lobbies sin ningun stat
+        // resuelto >= threshold (cuentas privadas/baneadas/sin matches
+        // 1v1) quedan fuera.
         if ($eloMin > 0) {
             $ads = array_values(array_filter($ads, function ($ad) use ($stats, $eloMin) {
-                $hostId = $ad['host_profile_id'] ?? null;
-                if (! $hostId) return false;
-                $rating = $stats[$hostId]['rating'] ?? null;
-                return $rating !== null && $rating >= $eloMin;
+                $pids = [];
+                if (! empty($ad['host_profile_id'])) {
+                    $pids[] = (int) $ad['host_profile_id'];
+                }
+                foreach ($ad['matchmembers'] ?? [] as $m) {
+                    if (! empty($m['profile_id'])) $pids[] = (int) $m['profile_id'];
+                }
+                foreach ($pids as $pid) {
+                    $rating = $stats[$pid]['rating'] ?? null;
+                    if ($rating !== null && $rating >= $eloMin) return true;
+                }
+                return false;
             }));
         }
 
