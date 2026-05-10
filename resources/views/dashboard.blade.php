@@ -58,38 +58,40 @@
         </a>
     @endif
 
-    {{-- CTA de votacion de pool — solo si hay una abierta. Si el user no
-         voto aun, copy "opina"; si ya voto, copy "podes cambiar el voto".
-         Al click abre el <dialog> renderizado abajo en _map_vote_modal. --}}
-    @if ($openVote)
-        @php $userVoted = $userBallot !== null; @endphp
-        <button type="button" onclick="document.getElementById('vote-modal').showModal()"
-                class="w-full text-left block rounded-xl border {{ $userVoted ? 'border-zinc-700' : 'border-accent/50' }} bg-gradient-to-r {{ $userVoted ? 'from-zinc-900/40' : 'from-accent-dark/30' }} to-zinc-900/40 p-4 sm:p-5 hover:from-accent-dark/40 transition-all">
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-                <div class="flex items-center gap-3">
-                    <div class="text-3xl shrink-0">🗳</div>
-                    <div>
-                        <div class="font-semibold {{ $userVoted ? 'text-zinc-200' : 'text-accent' }}">
+    {{-- Vote CTA + matchmaking section. Layout dinamico:
+           - Si hay openVote Y se puede buscar partida (no activeMatch): grid
+             1/3 vote + 2/3 matchmaking en lg+. Mobile apila vertical.
+           - Solo uno: ese ocupa full width.
+         El modal de votacion (_map_vote_modal) se incluye una sola vez al
+         final si hay openVote, independiente del layout. --}}
+    @php
+        $userVoted  = $openVote && $userBallot !== null;
+        $sideBySide = $openVote && ! $activeMatch;
+    @endphp
+
+    @if ($openVote || ! $activeMatch)
+        <div class="{{ $sideBySide ? 'grid grid-cols-1 lg:grid-cols-3 gap-4' : 'space-y-4' }}">
+            @if ($openVote)
+                <button type="button" onclick="document.getElementById('vote-modal').showModal()"
+                        class="{{ $sideBySide ? 'lg:col-span-1' : 'w-full' }} h-full text-left block rounded-xl border {{ $userVoted ? 'border-zinc-700' : 'border-accent/50' }} bg-gradient-to-br {{ $userVoted ? 'from-zinc-900/40' : 'from-accent-dark/30' }} to-zinc-900/40 p-5 sm:p-6 hover:from-accent-dark/40 transition-all flex flex-col justify-center">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="text-3xl shrink-0">🗳</div>
+                        <div class="font-semibold leading-tight {{ $userVoted ? 'text-zinc-200' : 'text-accent' }}">
                             {{ $userVoted ? 'Ya votaste — podés cambiar tu voto' : 'Hay una votación de pool abierta' }}
                         </div>
-                        <div class="text-xs text-zinc-400 mt-0.5">
-                            {{ $openVote->name }} · cierra {{ $openVote->ends_at->diffForHumans() }}
-                        </div>
                     </div>
-                </div>
-                <span class="text-sm font-semibold shrink-0 {{ $userVoted ? 'text-zinc-300' : 'text-accent' }}">
-                    {{ $userVoted ? 'Editar voto →' : 'Votar →' }}
-                </span>
-            </div>
-        </button>
+                    <div class="text-xs text-zinc-400 mb-3">
+                        {{ $openVote->name }} · cierra {{ $openVote->ends_at->diffForHumans() }}
+                    </div>
+                    <span class="text-sm font-semibold {{ $userVoted ? 'text-zinc-300' : 'text-accent' }}">
+                        {{ $userVoted ? 'Editar voto →' : 'Votar →' }}
+                    </span>
+                </button>
+            @endif
 
-        @include('partials._map_vote_modal')
-    @endif
-
-    {{-- Matchmaking CTA / queue state --}}
-    @if (!$activeMatch)
-        <section>
-            @if ($inCooldown)
+            @if (! $activeMatch)
+                <section class="{{ $sideBySide ? 'lg:col-span-2' : '' }}">
+                    @if ($inCooldown)
                 <div class="rounded-xl border border-red-900/60 bg-red-950/20 p-6 sm:p-8">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div class="flex-1">
@@ -168,7 +170,13 @@
                     </div>
                 </div>
             @endif
-        </section>
+                </section>
+            @endif
+        </div>
+    @endif
+
+    @if ($openVote)
+        @include('partials._map_vote_modal')
     @endif
 
     {{-- Tu card (mismo componente que aparece en draft) + atajo a vitrina --}}
