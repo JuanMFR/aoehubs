@@ -201,16 +201,31 @@
     @else
         {{-- Source = global --}}
 
-        {{-- Filtros global: search + observable toggle --}}
-        <form method="GET" action="{{ route('live') }}" class="flex flex-col sm:flex-row gap-2">
+        {{-- Filtros global: search + ELO mínimo + toggle "se puede ver" --}}
+        <form method="GET" action="{{ route('live') }}" class="flex flex-col sm:flex-row gap-2 flex-wrap">
             <input type="hidden" name="source" value="global">
             <input type="text" name="q" value="{{ $q }}" placeholder="Buscar mapa o lobby..." maxlength="60"
-                   class="flex-1 rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                   class="flex-1 min-w-[200px] rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
 
-            <label class="flex items-center gap-2 px-3 py-1.5 rounded border border-zinc-700 bg-zinc-950 text-sm cursor-pointer">
+            {{-- Filtro de ELO del host. Default 2000+ para mostrar solo top-tier. --}}
+            <select name="elo_min" onchange="this.form.submit()"
+                    class="rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none"
+                    title="Filtra lobbies por el rating 1v1 RM del host">
+                @foreach ($eloPresets as $preset)
+                    <option value="{{ $preset }}" {{ $eloMin === $preset ? 'selected' : '' }}>
+                        {{ $preset === 0 ? 'Cualquier ELO' : $preset . '+ ELO' }}
+                    </option>
+                @endforeach
+            </select>
+
+            {{-- Toggle "se puede ver" (= isobservable=1). Algunos lobbies no
+                 permiten que un externo entre como espectador; con este on
+                 los filtramos. --}}
+            <label class="flex items-center gap-2 px-3 py-1.5 rounded border border-zinc-700 bg-zinc-950 text-sm cursor-pointer"
+                   title="Algunos hosts no permiten spectators externos. Activá esto para esconder esos lobbies y ver solo los que podés observar.">
                 <input type="hidden" name="observable" value="0">
                 <input type="checkbox" name="observable" value="1" {{ $onlyObs ? 'checked' : '' }} onchange="this.form.submit()">
-                <span class="text-zinc-300">Solo spectables</span>
+                <span class="text-zinc-300">Solo los que se pueden ver</span>
             </label>
 
             <button type="submit"
@@ -218,10 +233,10 @@
                 Filtrar
             </button>
 
-            @if ($q)
+            @if ($q || $eloMin !== 2000)
                 <a href="{{ route('live', ['source' => 'global']) }}"
                    class="rounded border border-zinc-700 px-4 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800 self-center">
-                    Limpiar
+                    Reset
                 </a>
             @endif
         </form>
@@ -239,8 +254,10 @@
                     No hay lobbies que matcheen los filtros
                 </h2>
                 <p class="mt-2 text-sm text-zinc-500">
-                    @if ($onlyObs)
-                        Probá desactivar "Solo spectables" para ver lobbies en pre-game también.
+                    @if ($eloMin >= 2000)
+                        El filtro <strong>{{ $eloMin }}+ ELO</strong> es exigente — probá bajarlo.
+                    @elseif ($onlyObs)
+                        Probá desactivar "Solo los que se pueden ver" para incluir lobbies cerrados.
                     @else
                         Probá ajustar la búsqueda.
                     @endif

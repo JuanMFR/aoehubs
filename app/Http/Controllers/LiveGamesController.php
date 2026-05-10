@@ -107,6 +107,12 @@ class LiveGamesController extends Controller
     }
 
     /**
+     * Presets validos para el filtro de ELO minimo (rating del host).
+     * 0 = sin filtro. Default 2000 (top-tier solamente).
+     */
+    private const ELO_PRESETS = [0, 1500, 1800, 2000, 2200];
+
+    /**
      * Source=global: lobbies de la API de Relic, enriquecidos con stats
      * de los profile_ids del host + matchmembers.
      *
@@ -115,20 +121,36 @@ class LiveGamesController extends Controller
      *   - q           → LIKE en mapname OR description (lobby name)
      *   - observable  → '1' (default) muestra solo isobservable=1.
      *                   '0' o ausente: cualquiera. El user toggle.
+     *   - elo_min     → 0/1500/1800/2000/2200. Default 2000. Filtra
+     *                   lobbies donde el host tenga rating < threshold.
+     *                   Cualquier valor fuera de presets cae a default.
+     *
+     * Pipeline:
+     *   1. Fetch ads (cache 10s).
+     *   2. Filter cheap (q + observable, sin stats).
+     *   3. Resolver stats SOLO para los que sobreviven (no desperdiciar
+     *      hits a la API en lobbies que se van a filtrar).
+     *   4. Filter por elo_min usando stats.
+     *   5. Slice a 60 para limitar UI.
      */
     private function indexGlobal(Request $request)
     {
-        $q          = trim((string) $request->query('q', ''));
-        $onlyObs    = $request->query('observable', '1') !== '0';
+        $q       = trim((string) $request->query('q', ''));
+        $onlyObs = $request->query('observable', '1') !== '0';
+
+        $eloMin = (int) $request->query('elo_min', 2000);
+        if (! in_array($eloMin, self::ELO_PRESETS, true)) {
+            $eloMin = 2000;
+        }
 
         $ads = $this->relic->findAdvertisements();
 
-        // Filter por isobservable (default ON: solo lobbies spectables).
+        // (2a) isobservable filter
         if ($onlyObs) {
             $ads = array_values(array_filter($ads, fn ($a) => ($a['isobservable'] ?? 0) === 1));
         }
 
-        // Filter de search: mapname o description (lobby name).
+        // (2b) search filter
         if ($q !== '') {
             $needle = mb_strtolower($q);
             $ads = array_values(array_filter($ads, function ($a) use ($needle) {
@@ -137,8 +159,7 @@ class LiveGamesController extends Controller
             }));
         }
 
-        // Recolectamos profile_ids de host + matchmembers de los ads ya
-        // filtrados (no enriquecemos lo que no vamos a mostrar).
+        // (3) recolectar profile_ids de los ads sobrevivientes y resolver stats.
         $profileIds = [];
         foreach ($ads as $ad) {
             if (! empty($ad['host_profile_id'])) $profileIds[] = (int) $ad['host_profile_id'];
@@ -148,16 +169,28 @@ class LiveGamesController extends Controller
         }
         $stats = $this->relic->getPersonalStats($profileIds);
 
-        // Limit a los primeros N para no flood la UI. La API devuelve
-        // ~100 por default; mostramos los primeros 60.
+        // (4) elo_min filter sobre el rating del host. Lobbies sin stats
+        // resueltos para el host (profile privado, baneado, sin matches en
+        // 1v1) quedan fuera cuando hay threshold > 0 — son indistinguibles
+        // de "rating bajo" desde nuestro lado.
+        if ($eloMin > 0) {
+            $ads = array_values(array_filter($ads, function ($ad) use ($stats, $eloMin) {
+                $hostId = $ad['host_profile_id'] ?? null;
+                if (! $hostId) return false;
+                $rating = $stats[$hostId]['rating'] ?? null;
+                return $rating !== null && $rating >= $eloMin;
+            }));
+        }
+
+        // (5) slice 60 ads
         $ads = array_slice($ads, 0, 60);
 
         $source = 'global';
-        // Banner si la API devolvio vacio (puede ser que falle o
-        // genuinamente no haya lobbies — distinguimos por cache hit).
-        $apiOk = $this->relic->findAdvertisements() !== []
-                 || count($ads) > 0;
+        $apiOk  = $this->relic->findAdvertisements() !== [] || count($ads) > 0;
+        $eloPresets = self::ELO_PRESETS;
 
-        return view('live', compact('source', 'ads', 'stats', 'q', 'onlyObs', 'apiOk'));
+        return view('live', compact(
+            'source', 'ads', 'stats', 'q', 'onlyObs', 'eloMin', 'eloPresets', 'apiOk',
+        ));
     }
 }
