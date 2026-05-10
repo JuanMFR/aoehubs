@@ -87,6 +87,15 @@ class User extends Authenticatable
     }
 
     /**
+     * Ratings Glicko-2 por categoria de mapa. Filas se crean lazy en
+     * GameMatch::applyRatingChange el primer match en cada categoria.
+     */
+    public function categoryRatings(): HasMany
+    {
+        return $this->hasMany(UserCategoryRating::class);
+    }
+
+    /**
      * Helper centralizado: cuenta wins/losses/totales del user contra matches
      * completed. Si pasas $season, se restringe a esa season.
      *

@@ -91,6 +91,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/maps/{map}/toggle',    [AdminController::class, 'toggleMap'])->name('maps.toggle');
     Route::delete('/maps/{map}',         [AdminController::class, 'destroyMap'])->name('maps.destroy');
 
+    // Categorias de mapas (ladders por tipo)
+    Route::get('/map-categories',                  [AdminController::class, 'mapCategories'])->name('map-categories');
+    Route::post('/map-categories',                 [AdminController::class, 'storeMapCategory'])->name('map-categories.store');
+    Route::patch('/map-categories/{category}',     [AdminController::class, 'updateMapCategory'])->name('map-categories.update');
+    Route::post('/map-categories/{category}/toggle', [AdminController::class, 'toggleMapCategory'])->name('map-categories.toggle');
+    Route::delete('/map-categories/{category}',    [AdminController::class, 'destroyMapCategory'])->name('map-categories.destroy');
+
     // Map pool voting
     Route::get('/map-votes',                 [AdminController::class, 'mapVotes'])->name('map-votes');
     Route::post('/map-votes',                [AdminController::class, 'storeMapVote'])->name('map-votes.store');

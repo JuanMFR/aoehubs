@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Api\CompanionApiController;
 use App\Models\GameMatch;
 use App\Models\Map;
+use App\Models\MapCategory;
 use App\Models\MapPoolVote;
 use App\Models\QueueEntry;
 use App\Models\Season;
@@ -548,5 +549,69 @@ class AdminController extends Controller
         }
 
         return back()->with('flash', count($winners) . " ganadores aplicados al pool. Pool actual = " . Map::where('is_active', true)->count() . " mapas activos.");
+    }
+
+    // ─── Map Categories (ladders por tipo de mapa) ────────────────────
+
+    /**
+     * Lista categorias + form de creacion. Cada categoria representa una
+     * leaderboard derivada (ej. "Cerrados", "Agua") con su propio Glicko-2
+     * por user. Crear una categoria NO crea tablas/leaderboards nuevas —
+     * solo es una fila en map_categories. La leaderboard "se enciende"
+     * automatica al primer match en un mapa de esa categoria.
+     */
+    public function mapCategories()
+    {
+        $categories = MapCategory::ordered()
+            ->withCount('maps')
+            ->get();
+
+        return view('admin.map-categories', compact('categories'));
+    }
+
+    public function storeMapCategory(Request $request)
+    {
+        $data = $this->validateCategoryFields($request);
+        MapCategory::create($data);
+        return back()->with('flash', "Categoría '{$data['name']}' creada.");
+    }
+
+    public function updateMapCategory(Request $request, MapCategory $category)
+    {
+        $data = $this->validateCategoryFields($request, $category);
+        $category->update($data);
+        return back()->with('flash', "Categoría '{$category->name}' actualizada.");
+    }
+
+    public function toggleMapCategory(MapCategory $category)
+    {
+        $category->update(['is_active' => ! $category->is_active]);
+        $newState = $category->is_active ? 'activada' : 'desactivada';
+        return back()->with('flash', "Categoría '{$category->name}' {$newState}.");
+    }
+
+    public function destroyMapCategory(MapCategory $category)
+    {
+        // FK cascadeOnDelete se encarga del pivot map_category y de las
+        // user_category_ratings. Los matches historicos NO se ven afectados
+        // (la categoria no se referencia desde matches; el rating delta
+        // se aplico ya y vivio en user_category_ratings antes del cascade).
+        $name = $category->name;
+        $category->delete();
+        return back()->with('flash', "Categoría '{$name}' eliminada (junto con sus ratings y asociaciones).");
+    }
+
+    /** Validacion compartida store/update con unique-aware. */
+    private function validateCategoryFields(Request $request, ?MapCategory $cat = null): array
+    {
+        $idClause = $cat ? ',' . $cat->id : '';
+        return $request->validate([
+            'name'        => ['required', 'string', 'max:60', 'unique:map_categories,name' . $idClause],
+            'slug'        => ['required', 'string', 'max:60', 'alpha_dash', 'unique:map_categories,slug' . $idClause],
+            'description' => ['nullable', 'string', 'max:500'],
+            'icon_path'   => ['nullable', 'string', 'max:255'],
+            'sort_order'  => ['nullable', 'integer'],
+            'is_active'   => ['nullable', 'boolean'],
+        ]);
     }
 }

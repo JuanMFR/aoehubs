@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Map extends Model
 {
@@ -32,6 +33,12 @@ class Map extends Model
             'sort_order'        => 'integer',
             'pool_winner_count' => 'integer',
         ];
+    }
+
+    /** Categorias a las que pertenece (Cerrados, Agua, Open, etc). */
+    public function categories(): BelongsToMany
+    {
+        return $this->belongsToMany(MapCategory::class, 'map_category', 'map_id', 'category_id');
     }
 
     /** Scope: solo mapas activos. */
