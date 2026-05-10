@@ -182,14 +182,52 @@ Implementado en commit `a742aa8` (validación por `rms_map_id` para vanilla / `r
 - **N.2 — Switch UI ES/EN**: los campos `name_es`/`name_en` ya se persisten en `maps`, pero el blade sigue usando `__($map->name)` con `lang/es.json` (legacy). Cambiar el resolver a `$map->name_es ?? __($map->name) ?? $map->name` cuando se agregue toggle de locale al user.
 - **N.3 — `map_drafts.map_id` FK**: hoy `map_drafts.final_map` guarda string. Si admin renombra un mapa, drafts viejos quedan colgando. Refactor: agregar FK `map_id` que apunte a `maps.id`, y derivar `final_map` (string) solo para display. Más invasivo — tocar `MapDraftController`, validator, view drafts. Worth it cuando el pool empiece a tener turnover real.
 
-### O — Map pool voting (community-driven map rotation)
-Inspirado en el sistema de votación de pool de AoE2 ranked oficial. Permitir a la comunidad votar la próxima rotación de mapas desde admin.
+### O — ✅ IMPLEMENTADO — Map pool voting (community-driven map rotation)
+Sistema de votación replicando el ranked oficial:
+- Admin marca mapas como `is_fixed_in_pool` (siempre activos, no candidatos).
+- Admin crea votación con N candidatos + define `pool_size_voted` (top-N).
+- User vota multi-select hasta `pool_size_voted` desde modal en dashboard.
+- Cron `map-vote:close-expired` cierra y aplica al pool tras `ends_at`.
+- Tiebreaker: votos DESC, pool_winner_count ASC, random (favorece rotación).
+- Anti-repeat: ganadores de la votación previa quedan disabled como candidatos por defecto.
 
-Diseño aún por definir — ver discusión abierta. Escenarios principales:
-- Frecuencia: por season, mensual, ad-hoc.
-- Mecánica de voto: top-N por user (multi-select) vs single-vote.
-- Auto-rotación: ¿el cierre de votación reemplaza pool automáticamente o requiere confirmación admin?
-- Coexistencia con eventos pro-pack (item N): la votación tiene que poder pausarse/cancelarse cuando el admin quiera forzar un pool especial.
+### P — Map categories ladders
+Sistema de ratings por categoría de mapa. Cada Map puede pertenecer a 0..N categorías; cada categoría implica una leaderboard derivada con Glicko-2 independiente del global. Implementado en commits X1+X2+X3.
+
+- `map_categories` (admin CRUD), `map_category` pivot M2M, `user_category_ratings` lazy-creado.
+- `GameMatch::applyRatingChange` corre Glicko-2 per-category además del global.
+- `/leaderboard?category=<slug>` filtra por categoría.
+- Matchmaking sigue usando rating global — los ladders por categoría son visuales, no afectan emparejamiento.
+
+Follow-ups pendientes:
+
+- **P.1 — Awards/insignias por categoría al cierre de season**. Hoy las awards
+  son globales (`UserAward` sin `category_id`). Adaptar `SeasonService::closeSeason`
+  para emitir awards específicas por categoría (ej. "Top 1 de Cerrados", "Most active
+  in Water"). Requiere agregar `category_id` nullable a `user_awards` + lógica de
+  ranking por categoría en el cierre.
+
+- **P.2 — Snapshot de ratings categoría al cierre de season**. Análogo a
+  `season_stats` pero per-categoría. Necesario para "best rank en agua S2" en
+  perfiles. Tabla nueva `season_category_stats` con `(season_id, user_id, category_id,
+  final_rating, final_rd, final_rank)`. La snapshot la dispara `SeasonService::closeSeason`.
+
+- **P.3 — Backfill retroactivo de matches viejos**. Cuando agregás un mapa a
+  una categoría nueva, los matches históricos en ese mapa NO contribuyen a la nueva
+  categoría (only-going-forward). Si querés retroactividad, comando artisan que
+  itera matches completed con ese map y aplica Glicko-2 incrementalmente. Costoso
+  pero one-shot.
+
+- **P.4 — Profile page muestra ratings por categoría**. Hoy `/users/{steamId}`
+  muestra solo el rating global. Agregar sección con cards por categoría: rating,
+  RD, matches_played, posición en leaderboard de esa categoría. Diferido a otro
+  pase de UI.
+
+- **P.5 — W/L per-categoría en leaderboard**. Hoy la leaderboard categoría
+  muestra `cat_matches` (total jugados) pero el W/L sigue siendo global.
+  Per-cat W/L requiere joins extras `matches → mapDraft → maps → categories`
+  por user. Posible pero costoso; mantener si la métrica `matches` resulta
+  insuficiente para los users.
 
 ### L.1 — PENDIENTE — Allow second upload to override (replay race)
 - **Pendiente**: cuando un user alt+f4 mid-partida, el companion sube un replay incompleto que va a `invalid` (correcto, sin rating change). PERO si el OTRO companion sube su replay completo después, el endpoint lo rechaza con 409 (match ya resuelto).
