@@ -3,10 +3,11 @@
     cuando hay $openVote.
 
     Vars esperadas:
-      $openVote         — MapPoolVote (con candidates)
-      $userBallot       — MapPoolVoteBallot|null (el voto previo del user)
-      $voteTally        — Collection [{map, votes, pool_winner_count}]
-      $voteTotalBallots — int (cantidad total de users que ya votaron)
+      $openVote          — MapPoolVote (con candidates)
+      $userBallot        — MapPoolVoteBallot|null (el voto previo del user)
+      $voteTally         — Collection [{map, votes, pool_winner_count}]
+      $voteTotalBallots  — int (cantidad total de users que ya votaron) — header
+      $voteTotalMentions — int (suma de menciones en todos los ballots) — denom %
 --}}
 @php
     $selected   = $userBallot ? ($userBallot->votes_json ?? []) : [];
@@ -60,10 +61,10 @@
                     @php
                         $isSelected = in_array($map->id, $selected);
                         $voteCount  = (int) ($tallyByMap[$map->id]['votes'] ?? 0);
-                        $pct        = $voteTotalBallots > 0 ? round($voteCount / $voteTotalBallots * 100) : 0;
-                        // Tint alpha = pct/100 * 0.30 cap. Asi 0% queda transparente
-                        // y 100% queda con un dorado tenue, sin opacar el contenido.
-                        $tintAlpha = round($pct / 100 * 0.30, 3);
+                        // % = share de menciones de este mapa sobre total de menciones
+                        // emitidas en la votacion (no sobre cantidad de users).
+                        // Ej: 1 user vota 5 mapas → cada uno tiene 1/5 = 20%.
+                        $pct = $voteTotalMentions > 0 ? round($voteCount / $voteTotalMentions * 100) : 0;
                     @endphp
                     {{-- has-[:checked]: cambia border + intensidad de fondo cuando el
                          checkbox interno esta marcado. CSS-only para el highlight. --}}
@@ -72,12 +73,13 @@
                                   hover:bg-zinc-900/80
                                   has-[:checked]:border-accent has-[:checked]:bg-accent-dark/30">
 
-                        {{-- Tint de fondo proporcional al % de votos. Capa absoluta
-                             debajo del contenido, color accent (#D4AF37) con alpha
-                             escalada al porcentaje. Mas votos = fondo mas dorado. --}}
+                        {{-- Fill de fondo: el % del ancho de la card pintado en
+                             dorado translucido. Capa absoluta de altura completa,
+                             ancho = pct%, debajo del contenido. Visualiza el share
+                             de votos directamente como progress horizontal. --}}
                         @if ($pct > 0)
-                            <span class="absolute inset-0 pointer-events-none"
-                                  style="background-color: rgba(212, 175, 55, {{ $tintAlpha }})"
+                            <span class="absolute inset-y-0 left-0 pointer-events-none"
+                                  style="width: {{ $pct }}%; background-color: rgba(212, 175, 55, 0.25)"
                                   aria-hidden="true"></span>
                         @endif
 
@@ -94,9 +96,9 @@
                         <x-map-icon :name="$map->name" class="relative h-14 w-16 sm:h-16 sm:w-20 rounded mt-1" />
                         <div class="relative text-xs sm:text-sm text-center font-medium leading-tight">
                             <span>{{ $map->name_es ?? $map->name }}</span>
-                            @if ($voteTotalBallots > 0)
+                            @if ($voteTotalMentions > 0)
                                 <span class="text-zinc-400 font-mono ml-1"
-                                      title="{{ $voteCount }} {{ $voteCount === 1 ? 'voto' : 'votos' }}">{{ $pct }}%</span>
+                                      title="{{ $voteCount }} {{ $voteCount === 1 ? 'mención' : 'menciones' }} sobre {{ $voteTotalMentions }} totales">{{ $pct }}%</span>
                             @endif
                         </div>
                     </label>

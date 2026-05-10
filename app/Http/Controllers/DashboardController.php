@@ -90,20 +90,27 @@ class DashboardController extends Controller
             ->latest('id')
             ->first();
 
-        $userBallot       = null;
-        $voteTally        = null;
-        $voteTotalBallots = 0;
+        $userBallot         = null;
+        $voteTally          = null;
+        $voteTotalBallots   = 0;
+        $voteTotalMentions  = 0;
         if ($openVote !== null) {
             $userBallot       = $openVote->ballots()->where('user_id', $user->id)->first();
             $voteTally        = $openVote->tally();
             $voteTotalBallots = $openVote->ballots()->count();
+            // Total de menciones = suma de votos en cada candidato. Cada
+            // ballot contribuye N menciones (1 a pool_size_voted). Lo usamos
+            // como denominador del % por mapa: "del total de votos emitidos,
+            // que share corresponde a este mapa". Mas significativo que
+            // dividir por ballots cuando un ballot vota varios mapas.
+            $voteTotalMentions = $voteTally->sum('votes');
         }
 
         return view('dashboard', compact(
             'user', 'season', 'queueEntry', 'inCooldown', 'cooldownLeft', 'cooldownSeconds',
             'activeMatch', 'activeMatchUrl', 'activeMatchRival', 'seasonStats',
             'botInQueue', 'companionAlive',
-            'openVote', 'userBallot', 'voteTally', 'voteTotalBallots',
+            'openVote', 'userBallot', 'voteTally', 'voteTotalBallots', 'voteTotalMentions',
         ));
     }
 
