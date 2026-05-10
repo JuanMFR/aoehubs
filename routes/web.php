@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CivDraftController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeaderboardController;
+use App\Http\Controllers\LiveGamesController;
 use App\Http\Controllers\MapDraftController;
 use App\Http\Controllers\MapVoteController;
 use App\Http\Controllers\MatchController;
@@ -29,6 +30,7 @@ Route::view('/companion', 'companion')->name('companion');
 // Leaderboard + perfiles públicos. Throttle ligero para prevenir scraping.
 Route::middleware('throttle:public-read')->group(function () {
     Route::get('/leaderboard',          [LeaderboardController::class, 'index'])->name('leaderboard');
+    Route::get('/live',                 [LiveGamesController::class, 'index'])->name('live');
     Route::get('/users/{steamId}',      [UserProfileController::class, 'show'])->name('users.show')
         ->where('steamId', '\d{17}'); // SteamID64 son siempre 17 digitos
 });

@@ -37,6 +37,14 @@
                    class="px-3 py-1.5 rounded transition-colors {{ $route === 'leaderboard' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900' }}">
                     Leaderboard
                 </a>
+                <a href="{{ route('live') }}"
+                   class="px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 {{ $route === 'live' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900' }}">
+                    <span class="relative flex h-2 w-2">
+                        <span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
+                        <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                    </span>
+                    En vivo
+                </a>
                 @if (auth()->user()->isAdmin())
                     <a href="{{ route('admin.overview') }}"
                        class="px-3 py-1.5 rounded transition-colors {{ str_starts_with($route ?? '', 'admin.') ? 'bg-amber-950 text-amber-300' : 'text-amber-400 hover:text-amber-300 hover:bg-amber-950/40' }}">
@@ -80,6 +88,7 @@
             <a href="{{ route('dashboard') }}" class="flex-1 text-center py-2 {{ $route === 'dashboard' ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">Dashboard</a>
             <a href="{{ route('matches.index') }}" class="flex-1 text-center py-2 {{ str_starts_with($route ?? '', 'matches.') ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">Matches</a>
             <a href="{{ route('leaderboard') }}" class="flex-1 text-center py-2 {{ $route === 'leaderboard' ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">Ranking</a>
+            <a href="{{ route('live') }}" class="flex-1 text-center py-2 {{ $route === 'live' ? 'text-accent border-b-2 border-accent' : 'text-zinc-400' }}">En vivo</a>
             @if (auth()->user()->isAdmin())
                 <a href="{{ route('admin.overview') }}" class="flex-1 text-center py-2 {{ str_starts_with($route ?? '', 'admin.') ? 'text-amber-300 border-b-2 border-amber-400' : 'text-amber-400' }}">Admin</a>
             @endif
@@ -94,6 +103,13 @@
             </a>
             <div class="flex items-center gap-3">
                 <a href="{{ route('leaderboard') }}" class="text-sm text-zinc-400 hover:text-zinc-100">Leaderboard</a>
+                <a href="{{ route('live') }}" class="text-sm text-zinc-400 hover:text-zinc-100 flex items-center gap-1.5">
+                    <span class="relative flex h-2 w-2">
+                        <span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
+                        <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                    </span>
+                    En vivo
+                </a>
                 <a href="{{ route('companion') }}"
                    class="text-sm border border-accent/40 bg-accent-dark/40 text-accent hover:bg-accent-dark/80 px-3 py-1.5 rounded transition-colors">
                     Descargar companion
