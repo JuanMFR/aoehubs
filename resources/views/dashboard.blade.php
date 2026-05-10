@@ -526,7 +526,9 @@
         const voteChecks  = document.querySelectorAll('.vote-check');
         const voteCounter = document.getElementById('vote-modal-count');
         const voteSubmit  = document.getElementById('vote-modal-submit');
+        const voteError   = document.getElementById('vote-modal-error');
         const voteMax     = {{ $openVote->pool_size_voted }};
+        let voteErrorTimer = null;
 
         function updateVoteCount() {
             const n = Array.from(voteChecks).filter(c => c.checked).length;
@@ -534,12 +536,19 @@
             voteSubmit.disabled = n === 0;
         }
 
+        function showVoteError(msg) {
+            voteError.textContent = msg;
+            voteError.classList.remove('hidden');
+            clearTimeout(voteErrorTimer);
+            voteErrorTimer = setTimeout(() => voteError.classList.add('hidden'), 3000);
+        }
+
         voteChecks.forEach(c => {
             c.addEventListener('change', (e) => {
                 const checkedNow = Array.from(voteChecks).filter(x => x.checked).length;
                 if (checkedNow > voteMax) {
                     e.target.checked = false;
-                    alert('Solo podés elegir hasta ' + voteMax + ' mapas. Desmarcá uno antes de marcar otro.');
+                    showVoteError('Ya alcanzaste el máximo (' + voteMax + ' mapas). Desmarcá uno antes de marcar otro.');
                 }
                 updateVoteCount();
             });

@@ -52,6 +52,11 @@
                 </div>
             </div>
 
+            {{-- Mensaje inline rojo: el JS lo muestra al intentar marcar
+                 mas de pool_size_voted, y lo oculta solo tras 3s. Por
+                 default oculto (clase `hidden`). --}}
+            <p id="vote-modal-error" class="mb-3 text-sm text-red-400 hidden" role="alert"></p>
+
             @error('votes')
                 <div class="mb-3 rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-300">{{ $message }}</div>
             @enderror
