@@ -5,24 +5,42 @@ namespace App\Http\Controllers;
 use App\Models\GameMatch;
 use App\Models\Map;
 use App\Models\MapCategory;
+use App\Services\RelicApiClient;
 use Illuminate\Http\Request;
 
 /**
- * Listado publico de matches en curso (status=in_progress) — estilo
- * aoe2recs.com/live. Visible sin login para que se pueda compartir el
- * link a streamers, casters, comunidad.
+ * Listado publico de matches en curso — estilo aoe2recs.com/live.
+ * Visible sin login para que se pueda compartir el link a streamers,
+ * casters, comunidad.
  *
- * Filtros (todos opcionales, GET query):
- *   - q          → search por persona_name del host o opponent (LIKE %X%)
- *   - map        → filtra por Map::name
- *   - category   → filtra por MapCategory::slug (matches en mapas de esa cat)
+ * Dos sources:
+ *   - source=platform (default): matches de la plataforma (status=in_progress).
+ *     Filtros: q (player), map, category.
+ *   - source=global: lobbies/games globales de AoE2 DE via Relic API.
+ *     Filtra por defecto a isobservable=1 (los que se pueden spectear),
+ *     enriquece host + matchmembers con alias + rating via getPersonalStat.
+ *     Filtros: q (mapname o description).
  *
- * Auto-refresh client-side cada 15s — el companion alimenta los matches
- * y status_changes via API normal, no hay nada server-push aca.
+ * Auto-refresh client-side cada 15s. Cache server-side en RelicApiClient
+ * (10s para findAdvertisements, 5min por profile_id en getPersonalStat).
  */
 class LiveGamesController extends Controller
 {
+    public function __construct(private RelicApiClient $relic) {}
+
     public function index(Request $request)
+    {
+        $source = $request->query('source') === 'global' ? 'global' : 'platform';
+
+        if ($source === 'global') {
+            return $this->indexGlobal($request);
+        }
+
+        return $this->indexPlatform($request);
+    }
+
+    /** Source=platform: matches de nuestra DB. */
+    private function indexPlatform(Request $request)
     {
         $q          = trim((string) $request->query('q', ''));
         $mapFilter  = trim((string) $request->query('map', ''));
@@ -80,10 +98,66 @@ class LiveGamesController extends Controller
             ->values();
 
         $allCategories = MapCategory::active()->ordered()->get();
+        $source = 'platform';
 
         return view('live', compact(
-            'matches', 'q', 'mapFilter', 'catSlug', 'activeCategory',
+            'source', 'matches', 'q', 'mapFilter', 'catSlug', 'activeCategory',
             'playedMapNames', 'allCategories',
         ));
+    }
+
+    /**
+     * Source=global: lobbies de la API de Relic, enriquecidos con stats
+     * de los profile_ids del host + matchmembers.
+     *
+     * Filtros aplicables a global (mas limitados que platform — la API
+     * no expone categorias ni nuestro pool de mapas):
+     *   - q           → LIKE en mapname OR description (lobby name)
+     *   - observable  → '1' (default) muestra solo isobservable=1.
+     *                   '0' o ausente: cualquiera. El user toggle.
+     */
+    private function indexGlobal(Request $request)
+    {
+        $q          = trim((string) $request->query('q', ''));
+        $onlyObs    = $request->query('observable', '1') !== '0';
+
+        $ads = $this->relic->findAdvertisements();
+
+        // Filter por isobservable (default ON: solo lobbies spectables).
+        if ($onlyObs) {
+            $ads = array_values(array_filter($ads, fn ($a) => ($a['isobservable'] ?? 0) === 1));
+        }
+
+        // Filter de search: mapname o description (lobby name).
+        if ($q !== '') {
+            $needle = mb_strtolower($q);
+            $ads = array_values(array_filter($ads, function ($a) use ($needle) {
+                $hay = mb_strtolower(($a['mapname'] ?? '') . ' ' . ($a['description'] ?? ''));
+                return mb_strpos($hay, $needle) !== false;
+            }));
+        }
+
+        // Recolectamos profile_ids de host + matchmembers de los ads ya
+        // filtrados (no enriquecemos lo que no vamos a mostrar).
+        $profileIds = [];
+        foreach ($ads as $ad) {
+            if (! empty($ad['host_profile_id'])) $profileIds[] = (int) $ad['host_profile_id'];
+            foreach ($ad['matchmembers'] ?? [] as $m) {
+                if (! empty($m['profile_id'])) $profileIds[] = (int) $m['profile_id'];
+            }
+        }
+        $stats = $this->relic->getPersonalStats($profileIds);
+
+        // Limit a los primeros N para no flood la UI. La API devuelve
+        // ~100 por default; mostramos los primeros 60.
+        $ads = array_slice($ads, 0, 60);
+
+        $source = 'global';
+        // Banner si la API devolvio vacio (puede ser que falle o
+        // genuinamente no haya lobbies — distinguimos por cache hit).
+        $apiOk = $this->relic->findAdvertisements() !== []
+                 || count($ads) > 0;
+
+        return view('live', compact('source', 'ads', 'stats', 'q', 'onlyObs', 'apiOk'));
     }
 }
