@@ -36,6 +36,7 @@ class CompanionApiController extends Controller
             ->update(['status' => GameMatch::STATUS_ABANDONED]);
 
         $match = GameMatch::query()
+            ->with(['host', 'opponent', 'civDraft'])
             ->where(function ($q) use ($user) {
                 $q->where('host_user_id', $user->id)
                   ->orWhere('opponent_user_id', $user->id);
@@ -50,6 +51,19 @@ class CompanionApiController extends Controller
 
         $isHost = $match->host_user_id === $user->id;
 
+        // Picks del draft — civs y nombres de ambos players, asi el companion
+        // los renderiza en el overlay sin que el user tenga que alt-tabear a
+        // la web. Las civs vienen del CivDraft; si todavia no estan resueltas
+        // (match en `pending` con drafts a medias) van null.
+        $picks = [
+            'hostName' => $match->host?->displayName(),
+            'hostElo'  => $match->host    !== null ? (int) round($match->host->rating)     : null,
+            'oppName'  => $match->opponent?->displayName(),
+            'oppElo'   => $match->opponent !== null ? (int) round($match->opponent->rating) : null,
+            'hostCiv'  => $match->civDraft?->host_final_civ,
+            'oppCiv'   => $match->civDraft?->opponent_final_civ,
+        ];
+
         $payload = array_merge(
             [
                 'matchId'     => $match->id,
@@ -59,6 +73,7 @@ class CompanionApiController extends Controller
                 'status'      => $match->status,
             ],
             $match->config_json,
+            $picks,
         );
 
         return response()->json($payload);

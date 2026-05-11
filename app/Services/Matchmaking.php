@@ -182,7 +182,11 @@ class Matchmaking
             'host_user_id'     => $host->id,
             'opponent_user_id' => $opponent->id,
             'config_json'      => [
-                'lobbyName' => 'ranked-' . Str::lower(Str::random(6)),
+                // Nombre fijo de la plataforma — facilita identificar visualmente
+                // los matches en el lobby browser de AoE2 (casters/streamers).
+                // No se usa para validacion: la identidad del match se establece
+                // via lobby_id que el companion reporta tras OCR del header.
+                'lobbyName' => 'aoehubs.com',
                 'password'  => Str::lower(Str::random(8)),
                 'server'    => self::pickOptimalServer($host, $opponent),
                 'map'       => null, // se setea cuando termine el map draft
@@ -214,7 +218,11 @@ class Matchmaking
             'host_user_id'     => $host->id,
             'opponent_user_id' => $opponent->id,
             'config_json'      => [
-                'lobbyName' => 'ranked-' . Str::lower(Str::random(6)),
+                // Nombre fijo de la plataforma — facilita identificar visualmente
+                // los matches en el lobby browser de AoE2 (casters/streamers).
+                // No se usa para validacion: la identidad del match se establece
+                // via lobby_id que el companion reporta tras OCR del header.
+                'lobbyName' => 'aoehubs.com',
                 'password'  => Str::lower(Str::random(8)),
                 'server'    => 'westeurope',
                 'map'       => $map ?? (function () {
