@@ -30,6 +30,8 @@ class User extends Authenticatable
         'pings_json',
         'pings_updated_at',
         'cooldown_until',
+        'accepted_modes_json',
+        'queue_modes_tour_seen',
     ];
 
     protected $hidden = [
@@ -39,13 +41,32 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'rating'            => 'float',
-            'rating_deviation'  => 'float',
-            'rating_volatility' => 'float',
-            'pings_json'        => 'array',
-            'pings_updated_at'  => 'datetime',
-            'cooldown_until'    => 'datetime',
+            'rating'                => 'float',
+            'rating_deviation'      => 'float',
+            'rating_volatility'     => 'float',
+            'pings_json'            => 'array',
+            'pings_updated_at'      => 'datetime',
+            'cooldown_until'        => 'datetime',
+            'accepted_modes_json'   => 'array',
+            'queue_modes_tour_seen' => 'boolean',
         ];
+    }
+
+    /**
+     * Modos de queue que el user acepta. Si nunca configuró su preferencia,
+     * default los 3 (acepta cualquier modo — comportamiento histórico).
+     *
+     * Filtra valores inválidos defensivamente por si el JSON quedó con
+     * basura de una versión anterior del feature.
+     */
+    public function acceptedModes(): array
+    {
+        $stored = $this->accepted_modes_json;
+        if (! is_array($stored) || empty($stored)) {
+            return GameMatch::MODES;
+        }
+        $clean = array_values(array_intersect($stored, GameMatch::MODES));
+        return ! empty($clean) ? $clean : GameMatch::MODES;
     }
 
     public function isInCooldown(): bool

@@ -20,6 +20,7 @@ class GameMatch extends Model
         'config_json',
         'lobby_id',
         'status',
+        'mode',
         'started_at',
         'host_heartbeat_at',
         'opponent_heartbeat_at',
@@ -77,6 +78,45 @@ class GameMatch extends Model
     public const STATUS_INVALID            = 'invalid';
     public const STATUS_ABANDONED          = 'abandoned';
 
+    // Modos de queue. El user marca qué modos acepta; al emparejar, se elige
+    // el "más restrictivo" (menos drafts) del overlap. Mismo Glicko-2 en los
+    // tres modos, sin leaderboards separados.
+    //
+    //   FULL_DRAFT        → drafts de mapa y civ (como original).
+    //   RANDOM_CIV_MAP    → map draft + civ "Random" en lobby (sin civ check).
+    //   RANDOM_CIV_ARABIA → sin drafts; mapa Arabia, civ "Random".
+    //
+    // RESTRICTIVENESS define el orden para elegir el modo del match cuando
+    // los users tienen multiples modos en comun: indice mas alto = mas
+    // restrictivo. Si A=[full_draft, random_civ_map, random_civ_arabia] y
+    // B=[random_civ_arabia], el comun es random_civ_arabia → gana.
+    public const MODE_FULL_DRAFT        = 'full_draft';
+    public const MODE_RANDOM_CIV_MAP    = 'random_civ_map';
+    public const MODE_RANDOM_CIV_ARABIA = 'random_civ_arabia';
+
+    public const MODES = [
+        self::MODE_FULL_DRAFT,
+        self::MODE_RANDOM_CIV_MAP,
+        self::MODE_RANDOM_CIV_ARABIA,
+    ];
+
+    /**
+     * Restrictiveness ordering: el de indice mas alto gana cuando hay
+     * multiples modos en comun entre dos queue entries.
+     */
+    public const MODE_RESTRICTIVENESS = [
+        self::MODE_FULL_DRAFT        => 0,
+        self::MODE_RANDOM_CIV_MAP    => 1,
+        self::MODE_RANDOM_CIV_ARABIA => 2,
+    ];
+
+    /** Label user-facing de cada modo. Sin "Pro" ni nada elitista — solo descriptivo. */
+    public const MODE_LABELS = [
+        self::MODE_FULL_DRAFT        => 'Picks de mapa y civilización',
+        self::MODE_RANDOM_CIV_MAP    => 'Random civ + draft de mapa',
+        self::MODE_RANDOM_CIV_ARABIA => 'Random civ + Arabia',
+    ];
+
     /** Lista canónica para iterar (filtros admin, validation, etc.). */
     public const STATUSES = [
         self::STATUS_DRAFTING,
@@ -104,7 +144,30 @@ class GameMatch extends Model
                     $match->season_id = $current->id;
                 }
             }
+            // Default mode para matches creados sin especificar — preserva
+            // comportamiento historico antes del feature de queue modes.
+            if ($match->mode === null) {
+                $match->mode = self::MODE_FULL_DRAFT;
+            }
         });
+    }
+
+    /** Label user-facing del modo del match. */
+    public function modeLabel(): string
+    {
+        return self::MODE_LABELS[$this->mode] ?? self::MODE_LABELS[self::MODE_FULL_DRAFT];
+    }
+
+    /** True si el modo NO incluye civ draft (las civs van "Random" en lobby). */
+    public function isRandomCivMode(): bool
+    {
+        return in_array($this->mode, [self::MODE_RANDOM_CIV_MAP, self::MODE_RANDOM_CIV_ARABIA], true);
+    }
+
+    /** True si el modo NO incluye map draft (mapa fijo Arabia). */
+    public function isFixedMapMode(): bool
+    {
+        return $this->mode === self::MODE_RANDOM_CIV_ARABIA;
     }
 
     public function season(): BelongsTo
