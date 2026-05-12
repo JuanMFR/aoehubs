@@ -404,10 +404,6 @@
                 return;
             }
 
-            const exists = data.already_exists
-                ? '<div class="text-xs text-amber-400 mt-2">⚠ Ya existe un mapa con este canonical name. Usá la sección de edición arriba.</div>'
-                : '';
-
             // Helper: escape para evitar XSS si rms_filename tuviera caracteres raros.
             const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -470,45 +466,78 @@
             }
 
             // Caso normal: parser reconoció todo (mapa vanilla conocido por mgz).
-            resultEl.innerHTML = `
-                <div class="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
-                    <div class="text-sm text-emerald-300 font-medium mb-3">✓ Metadata extraída</div>
-                    <div class="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
-                        <div><span class="text-zinc-500">map_name:</span> <span class="text-emerald-300">${esc(data.map_name)}</span></div>
-                        <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-emerald-300">${esc(data.rms_map_id) || '—'}</span></div>
-                        <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${esc(data.rms_filename) || '—'}</span></div>
-                        <div><span class="text-zinc-500">icon_path:</span> <span class="text-zinc-400">${esc(data.icon_path)}</span></div>
-                    </div>
-                    ${exists}
-                    <form method="POST" action="{{ route('admin.maps.store') }}" class="mt-3 space-y-3">
-                        @csrf
-                        <input type="hidden" name="name" value="${esc(data.map_name)}">
-                        <input type="hidden" name="rms_map_id" value="${esc(data.rms_map_id) || ''}">
-                        <input type="hidden" name="rms_filename" value="${esc(data.rms_filename)}">
-                        <input type="hidden" name="icon_path" value="${esc(data.icon_path)}">
-                        <input type="hidden" name="sort_order" value="999">
-                        <input type="hidden" name="is_active" value="1">
-                        <input type="hidden" name="is_custom" value="0">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display ES (opcional)</label>
-                                <input type="text" name="name_es" maxlength="60" placeholder="ej. Selva Negra"
-                                    class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display EN (opcional)</label>
-                                <input type="text" name="name_en" maxlength="60" value="${esc(data.map_name)}"
-                                    class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
-                            </div>
+            // Si ya existe un mapa con ese name → form de UPDATE al existente
+            // (solo actualiza el fingerprint, conserva name_es/en/icon/etc).
+            // Sino → form de CREATE normal.
+            const datablock = `
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
+                    <div><span class="text-zinc-500">map_name:</span> <span class="text-emerald-300">${esc(data.map_name)}</span></div>
+                    <div><span class="text-zinc-500">rms_map_id:</span> <span class="text-emerald-300">${esc(data.rms_map_id) || '—'}</span></div>
+                    <div><span class="text-zinc-500">rms_filename:</span> <span class="text-zinc-400">${esc(data.rms_filename) || '—'}</span></div>
+                    <div><span class="text-zinc-500">icon_path sugerido:</span> <span class="text-zinc-400">${esc(data.icon_path)}</span></div>
+                </div>`;
+
+            if (data.already_exists) {
+                // PATCH al mapa existente — solo cambiamos el fingerprint.
+                // No tocamos name_es/name_en/icon_path/sort_order/is_active/
+                // is_fixed_in_pool: conservamos lo que el admin ya configuró.
+                const updateAction = '{{ url('admin/maps') }}/' + data.existing_map_id;
+                resultEl.innerHTML = `
+                    <div class="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
+                        <div class="text-sm text-emerald-300 font-medium mb-3">✓ Metadata extraída</div>
+                        ${datablock}
+                        <div class="rounded-lg border border-amber-700/40 bg-amber-950/20 p-3 text-sm text-amber-300 mb-3">
+                            ⚠ Ya existe <strong>${esc(data.existing_map_name)}</strong> en el pool. Vas a actualizar SU fingerprint (rms_map_id + rms_filename) con los datos del replay. No se tocan el nombre, traducciones, ícono ni demás flags.
                         </div>
-                        <button type="submit" ${data.already_exists ? 'disabled' : ''}
-                                class="rounded bg-accent text-accent-dark px-4 py-2 text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-60">
-                            Crear mapa con estos datos
-                        </button>
-                        <p class="text-xs text-zinc-500">Acordate de subir el icono a <code>public/images/${esc(data.icon_path)}</code>.</p>
-                    </form>
-                </div>
-            `;
+                        <form method="POST" action="${updateAction}" class="space-y-3">
+                            @csrf
+                            <input type="hidden" name="_method" value="PATCH">
+                            <input type="hidden" name="name" value="${esc(data.existing_map_name)}">
+                            <input type="hidden" name="rms_map_id" value="${esc(data.rms_map_id) || ''}">
+                            <input type="hidden" name="rms_filename" value="${esc(data.rms_filename)}">
+                            <input type="hidden" name="is_custom" value="0">
+                            <button type="submit"
+                                    class="rounded bg-accent text-accent-dark px-4 py-2 text-sm font-semibold hover:bg-accent-hover transition-colors">
+                                Actualizar fingerprint de "${esc(data.existing_map_name)}"
+                            </button>
+                        </form>
+                    </div>
+                `;
+            } else {
+                resultEl.innerHTML = `
+                    <div class="rounded-lg border border-emerald-700/50 bg-emerald-950/20 p-4">
+                        <div class="text-sm text-emerald-300 font-medium mb-3">✓ Metadata extraída</div>
+                        ${datablock}
+                        <form method="POST" action="{{ route('admin.maps.store') }}" class="mt-3 space-y-3">
+                            @csrf
+                            <input type="hidden" name="name" value="${esc(data.map_name)}">
+                            <input type="hidden" name="rms_map_id" value="${esc(data.rms_map_id) || ''}">
+                            <input type="hidden" name="rms_filename" value="${esc(data.rms_filename)}">
+                            <input type="hidden" name="icon_path" value="${esc(data.icon_path)}">
+                            <input type="hidden" name="sort_order" value="999">
+                            <input type="hidden" name="is_active" value="1">
+                            <input type="hidden" name="is_custom" value="0">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display ES (opcional)</label>
+                                    <input type="text" name="name_es" maxlength="60" placeholder="ej. Selva Negra"
+                                        class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-zinc-500 uppercase tracking-wider mb-1">Display EN (opcional)</label>
+                                    <input type="text" name="name_en" maxlength="60" value="${esc(data.map_name)}"
+                                        class="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-sm focus:border-accent focus:outline-none">
+                                </div>
+                            </div>
+                            <button type="submit"
+                                    class="rounded bg-accent text-accent-dark px-4 py-2 text-sm font-semibold hover:bg-accent-hover transition-colors">
+                                Crear mapa con estos datos
+                            </button>
+                            <p class="text-xs text-zinc-500">Acordate de subir el icono a <code>public/images/${esc(data.icon_path)}</code>.</p>
+                        </form>
+                    </div>
+                `;
+            }
         } catch (e) {
             resultEl.innerHTML = `<div class="rounded-lg border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-300">Error de red: ${e.message}</div>`;
         } finally {

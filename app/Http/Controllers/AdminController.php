@@ -354,6 +354,11 @@ class AdminController extends Controller
             $suggestIsCustom = $partial && $rmsFile !== null
                 && ! preg_match('/^[A-Z_]+\.rms$/', $rmsFile);
 
+            // Si el mapa ya existe en DB por su canonical name, devolvemos su
+            // id asi el frontend ofrece "Actualizar fingerprint del existente"
+            // en lugar de obligar al admin a un round-trip al modal de edicion.
+            $existing = $mapName ? Map::where('name', $mapName)->first() : null;
+
             return response()->json([
                 'ok'                => true,
                 'partial'           => $partial,
@@ -362,7 +367,9 @@ class AdminController extends Controller
                 'rms_filename'      => $rmsFile,
                 'icon_path'         => $slug ? "maps/{$slug}.png" : '',
                 'suggest_is_custom' => $suggestIsCustom,
-                'already_exists'    => $mapName ? Map::where('name', $mapName)->exists() : false,
+                'already_exists'    => $existing !== null,
+                'existing_map_id'   => $existing?->id,
+                'existing_map_name' => $existing?->name,
                 'partial_message'   => $partial
                     ? "El parser no conoce el nombre del mapa para rms_map_id={$rmsId}. "
                       . "Esto pasa con mapas nuevos del juego que mgz-fast todavia no actualizo. "
